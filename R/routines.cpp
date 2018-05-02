@@ -70,7 +70,7 @@ List CAVloop(NumericVector BETA, NumericVector y, double empiricalQuantile)
 }
 
 // [[Rcpp::export]]
-List ADAPTIVEloop(NumericVector BETA, NumericVector y, double THETA, double K, double empiricalQuantile)
+List ADAPTIVEloop(NumericVector BETA, NumericVector y, double THETA, double G, double empiricalQuantile)
 {
   int p          = y.size();
   NumericVector VaR(p);
@@ -84,7 +84,7 @@ List ADAPTIVEloop(NumericVector BETA, NumericVector y, double THETA, double K, d
   for(i = 1; i < p; i++)
   {
     /* Adaptive */
-    VaR[i] = VaR[i-1] + BETA[0] * (1/(1 + exp(K*(y[i-1]+ VaR[i-1]))) - THETA);		
+    VaR[i] = VaR[i-1] + BETA[0] * (1/(1 + exp(G*(y[i-1]+ VaR[i-1]))) - THETA);		
     
   }
   return  List::create(Rcpp::Named("VaR") = VaR);
