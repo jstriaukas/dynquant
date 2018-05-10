@@ -1,12 +1,20 @@
 Rcpp::sourceCpp('routines.cpp')
 
-fit.dyn.quant <- function(z, type, iscaviar, mc = FALSE, quant.type = c("var", "quant"), ...) {
-  call <- match.call()
+fit.dyn.quant <- function(z, type=c('symabs','igarch','simple','adapt','asymslope', 'hybrid','qmidas'), mc = FALSE, quant.type = c("var", "quant"), ...) {
+  call       <- match.call()
+  type       <- match.arg(type)
+  
+  if(type == "qmidas"){
+    iscaviar <- 0 
+  } else {
+    iscaviar <- 1
+  }
+  
   Z <- list(...)
   
   if(mc){ if(length(Z$ncores) == 0) { ncores = detectCores()} }
   
-  if(length(Z$num.bestevals)==0){Z$num.bestevals = 10}
+  if(length(Z$num.bestevals)==0){Z$num.bestevals = 5}
   
   if(length(Z$empiricalQuantile)==0){
     if(iscaviar==1){
@@ -15,20 +23,23 @@ fit.dyn.quant <- function(z, type, iscaviar, mc = FALSE, quant.type = c("var", "
     }
       Z$empiricalQuantile <- NULL
   }
-  empiricalQuantile <- Z$empiricalQuantile
-
-  quant.type           <- match.arg(quant.type)
+  
+  empiricalQuantile <- Z$empiricalQuantil
+  quant.type        <- match.arg(quant.type)
+  
   if (quant.type != "var" && quant.type != "quant"){
     quant.type = "var"
-    warning("Either quant.type not set or this option is not available. In this case, VaR is defined as a positive")
+    warning("Either quant.type not set or this option is not available. In this case, VaR is defined being positive number.")
   }
   
-  constraints         <- get.constraints(type, iscaviar)
+  constraints   <- get.constraints(type, iscaviar)
   starting.vals <- get.initial(type, iscaviar)
   RQ            <- NULL
   
   if (iscaviar == 0){
-    if (length(Z$yLowFreq) ==0 || length(Z$xHighFreq)){
+    if (length(Z$yLowFreq) ==0 || length(Z$xHighFreq) == 0){
+    if (length(Z$period)==0){Z$period <- 22}
+    if (length(Z$lag)==0){Z$lag <- 22}
     z <- get.midas.structure(z$y, period = Z$period, nlag = Z$nlag)
     } else {
     z$xHighFreq <- Z$xHighFreq  
@@ -36,11 +47,11 @@ fit.dyn.quant <- function(z, type, iscaviar, mc = FALSE, quant.type = c("var", "
   }
   } 
   
-  if(!mc)RQ <-lapply(1:dim(starting.vals)[1], get.best.intial, 
+  if(!mc) RQ <-lapply(1:dim(starting.vals)[1], get.best.intial, 
                      type, z, iscaviar, starting.vals, quant.type, empiricalQuantile) 
   
-
-  if(mc)RQ <- mclapply(1:dim(starting.vals)[1], get.best.intial, 
+  
+  if(mc) RQ <- mclapply(1:dim(starting.vals)[1], get.best.intial, 
                        type, z, iscaviar, starting.vals, quant.type, empiricalQuantile, mc.cores = ncores)
   
   
@@ -52,42 +63,42 @@ fit.dyn.quant <- function(z, type, iscaviar, mc = FALSE, quant.type = c("var", "
   best.evals <- all.vals[1:Z$num.bestevals,2:dim(all.vals)[2]]
   
   if(!mc) est  <-  lapply(1:dim(best.evals)[1], get.optimal, 
-                          best.evals, CONST, z, type, iscaviar, quant.type, empiricalQuantile)
+                          best.evals, constraints, z, type, iscaviar, quant.type, empiricalQuantile)
   if(mc)  est  <-  mclapply(1:dim(best.evals)[1], get.optimal, 
-                            best.evals, CONST, z, type, iscaviar, quant.type, empiricalQuantile, mc.cores = ncores)
+                            best.evals, constraints, z, type, iscaviar, quant.type, empiricalQuantile, mc.cores = ncores)
   
   val <- NULL
   for(j in 1:length(est)){val[j] <- est[[j]]$value }
   
-  temp         <- est[min(val)==val]
-  fit$est.params <- as.numeric(temp[[1]][1:dim(best.evals)[2]])
+  temp           <- est[min(val)==val]
+  
+  est.params <- as.numeric(temp[[1]][1:dim(best.evals)[2]])
   
   
   if(iscaviar == 1){
-    fit <- compute.caviar(fit$est.params, z, type, out.val = 1,  quant.type, empiricalQuantile)
+    fit <- compute.caviar(est.params, z, type, out.val = 1,  quant.type, empiricalQuantile)
   } else {
-    fit <- compute.qmidas(fit$est.params, z, out.val = 1, quant.type)
+    fit <- compute.qmidas(est.params, z, out.val = 1, quant.type)
   }
-  
-  fit <- dq.stat(fit, type, quant.type, lags = 4)
-  fit$std.error <- sqrt(diag(fit$VCmatrix))
-  fit$pval      <- pnorm(-abs(fit$est.params)/fit$std.error)
-  fit$call      <- call
+  fit$est.params <- est.params
+  #fit            <- dq.stat(fit, type, quant.type, lags = 4)
+  #fit$std.error  <- sqrt(diag(fit$VCmatrix))
+  #fit$pval       <- pnorm(-abs(fit$est.params)/fit$std.error)
+  fit$call       <- call
+
   return(fit = fit)
 }
 
-compute.qmidas <- function(betacoeff, z, out.val, quant.type) {
+compute.qmidas <- function(BETA, z, out.val, quant.type) {
   
   
   Y         <- z$yLowFreq
   X         <- z$xHighFreq
   THETA     <- z$theta
   
-  quant.type           <- match.arg(quant.type)
-  
-  intercept <- betacoeff[1]
-  slope     <- betacoeff[2]
-  k2        <- betacoeff[3]
+  intercept <- BETA[1]
+  slope     <- BETA[2]
+  k2        <- BETA[3]
   nlag      <- ncol(z$xHighFreq)
   k1        <- 1
   
@@ -96,8 +107,8 @@ compute.qmidas <- function(betacoeff, z, out.val, quant.type) {
   
   CondQuant <- intercept + slope * (z$xHighFreq%*%W)
   
-  VaR <- -CondQuant
   VaR <- CondQuant
+  
   
   Hit <- (Y < -VaR) - THETA
   RQ  <-  -t(Hit)%*%(Y + VaR)
@@ -110,7 +121,6 @@ compute.qmidas <- function(betacoeff, z, out.val, quant.type) {
     }
     z$Hit <- Hit
     z$RQ <- RQ
-    z$CondQuant <- CondQuant
     class(z) <- "dymquant"
   } else if(out.val == 0){
     z <- as.numeric(RQ)
@@ -119,28 +129,28 @@ compute.qmidas <- function(betacoeff, z, out.val, quant.type) {
   return(z)
 }
 
-compute.caviar <- function(betacoeff, z, type=c('symabs','igarch','simple','adapt','asymslope', 'hybrid'), out.val = 0, quant.type, empiricalQuantile) {
+compute.caviar <- function(BETA, z, type=c('symabs','igarch','simple','adapt','asymslope', 'hybrid'), out.val = 0, quant.type, empiricalQuantile) {
   
   Y                    <- z$y
   THETA                <- z$theta
   type                 <- match.arg(type)
   
   if(type == 'symabs') {
-    if(length(betacoeff) != 3){stop("betacoeff is of the size 3x1")}
-    VaR   <- CAVSAVloop(betacoeff, Y, empiricalQuantile)
+    if(length(BETA) != 3){stop("BETA is of the size 3x1")}
+    VaR   <- CAVSAVloop(BETA, Y, empiricalQuantile)
   } else if(type == 'igarch'){
-    if(length(betacoeff) != 3){stop("betacoeff is of the size 3x1")}
-    VaR   <- CAVGARCHloop(betacoeff, Y, empiricalQuantile)
+    if(length(BETA) != 3){stop("BETA is of the size 3x1")}
+    VaR   <- CAVGARCHloop(BETA, Y, empiricalQuantile)
   } else if(type == 'simple'){
-    if(length(betacoeff) != 3){stop("betacoeff is of the size 3x1")}
-    VaR   <- CAVloop(betacoeff, Y, empiricalQuantile)
+    if(length(BETA) != 3){stop("BETA is of the size 3x1")}
+    VaR   <- CAVloop(BETA, Y, empiricalQuantile)
   } else if(type == 'adapt'){
-    if(length(betacoeff) != 2){stop("betacoeff is of the size 2x1")}
-    G     <- betacoeff[2]
-    VaR   <- ADAPTIVEloop(betacoeff[1], Y, THETA, G, empiricalQuantile)
+    if(length(BETA) != 2){stop("BETA is of the size 2x1")}
+    G     <- BETA[2]
+    VaR   <- ADAPTIVEloop(BETA[1], Y, THETA, G, empiricalQuantile)
   } else if(type == 'asymslope'){ 
-    if(length(betacoeff) != 4){stop("betacoeff is of the size 4x1")}
-    VaR   <- ASYMloop(betacoeff, Y, empiricalQuantile)
+    if(length(BETA) != 4){stop("BETA is of the size 4x1")}
+    VaR   <- ASYMloop(BETA, Y, empiricalQuantile)
   } else {
     stop('Please choose a different type of CAViaR specification (see documentation for more details)')
   }
@@ -156,7 +166,6 @@ compute.caviar <- function(betacoeff, z, type=c('symabs','igarch','simple','adap
     }
     z$Hit <- Hit
     z$RQ <- RQ
-    z$CondQuant <- -VaR
     z$quant.type <- quant.type
     class(z) <- "dymquant"
     
@@ -233,11 +242,11 @@ get.constraints   <- function(type, iscaviar){
     } else if(type == 'igarch'){
      
       const$LB[1] <- -100  
-      const$LB[2] <-  0  
-      const$LB[3] <-  0
+      const$LB[2] <-    0  
+      const$LB[3] <-    0
       const$UB[1] <-  100  
-      const$UB[2] <- 100  
-      const$UB[3] <- 100
+      const$UB[2] <-  100  
+      const$UB[3] <-  100
       
     } else if(type == 'simple'){
 
@@ -363,12 +372,12 @@ if (iscaviar == 1) {
       }
         est <-  optimx(as.numeric(est[1:length(param[dt,])]), compute.caviar,  z=z, type=type, out.val = 0, quant.type=quant.type, empiricalQuantile=empiricalQuantile, method = c("Nelder-Mead"))
   } else {
-        est <- optimx(param[dt, ], compute.qmidas, z=z, out.val = 0, out.val = 0, quant.type=quant.type, method = c("Nelder-Mead")) 
+        est <- optimx(param[dt, ], compute.qmidas, z=z, out.val = 0,  quant.type=quant.type, method = c("Nelder-Mead")) 
       for (i in 1:REP) {
-        est <-  optimx(as.numeric(est[1:length(param[dt,])]), compute.qmidas,  z=z, type=type, out.val = 0, quant.type, method = c("Nelder-Mead"))
-        est <-  optimx(as.numeric(est[1:length(param[dt,])]), compute.qmidas,  z=z, type=type, out.val = 0, quant.type, method = c("BFGS"))
+        est <-  optimx(as.numeric(est[1:length(param[dt,])]), compute.qmidas, z=z, out.val = 0, quant.type=quant.type, method = c("Nelder-Mead")) 
+        est <-  optimx(as.numeric(est[1:length(param[dt,])]), compute.qmidas, z=z, out.val = 0, quant.type=quant.type, method = c("BFGS"))
       } 
-        est <-  optimx(as.numeric(est[1:length(param[dt,])]), compute.qmidas,  z=z, type=type, out.val = 0, quant.type, method = c("Nelder-Mead"))
+        est <-  optimx(as.numeric(est[1:length(param[dt,])]), compute.qmidas, z=z, out.val = 0, quant.type=quant.type, method = c("Nelder-Mead")) 
   }
       return(est = est)
 }
