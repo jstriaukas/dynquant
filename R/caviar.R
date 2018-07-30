@@ -1,3 +1,4 @@
+
 rm(list = ls())
 setwd('/Users/striaukas/Dropbox/PhD/Projects/FINMETRICS/R')
 #require('zoo')
