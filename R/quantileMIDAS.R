@@ -1,12 +1,11 @@
-
 rm(list = ls())
-setwd('/Users/striaukas/Dropbox/PhD/Projects/FINMETRICS/R')
+setwd('/Users/striaukas/Documents/GitHub/dynquant')
 #require('zoo')
 require('parallel')
 require('optimx')
 require("cmaes")
 #require('ggplot2')
-source('functions.R')
+source('R/functions.R')
 
 set.seed(11)
 load("/Users/striaukas/Dropbox/PhD/Projects/FINMETRICS/Data/dataQuantileMIDAS.RData")

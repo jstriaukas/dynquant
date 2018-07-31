@@ -79,7 +79,7 @@ NumericVector mmult(NumericVector a, NumericMatrix b, int p){
 }
 
 // [[Rcpp::export]]
-List MvMqCavLoop(NumericVector c,NumericMatrix a,NumericMatrix b,NumericMatrix y,NumericMatrix X,NumericVector Theta,NumericVector EmpiricalQuantile) {
+List MvMqCavLoop(NumericVector c,NumericMatrix a,NumericMatrix r,NumericMatrix y,NumericMatrix X,NumericVector Theta,NumericVector EmpiricalQuantile) {
   int i,j;
   int p = y.ncol(), n = y.nrow();
   double rq = 0, temp = 0;
@@ -88,7 +88,7 @@ List MvMqCavLoop(NumericVector c,NumericMatrix a,NumericMatrix b,NumericMatrix y
   q.row(0) = EmpiricalQuantile;
   /*1. X - information set up to t-1, computing regression quantiles */
   for (i = 1; i < n; ++i) {
-    q(i,_) = c+mmult(q(i-1,_),b,p)+mmult(X(i-1,_),a,p);
+    q(i,_) = c+mmult(q(i-1,_),a,p)+mmult(X(i-1,_),r,p);
   }
   /*2. computing rq statistic for MVMQCAViaR */
   for (i = 0; i < n; ++i) {
