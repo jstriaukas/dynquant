@@ -61,18 +61,24 @@ fit.mv.dyn.quant <- function(theta,z,type=c("cav"),is.midas,opt.method=c("nelder
   rq.stat <- unlist(rq.stat)
   all.evals <- cbind(rq.stat,starting.vals)
   all.evals <- all.evals[order(rq.stat),]
-  min.rq.stat.evals <- all.evals[1:dq.options$num.min.rq.stat.evals,2:dim(all.evals)[2]]
-  min.rq.stat.evals <- matrix(as.numeric(min.rq.stat.evals), dq.options$num.min.rq.stat.evals,dim(all.evals)[2]-1)
-  constraints <- get.mv.constraints("cav",is.midas,p)
+  min.rq.stat.evals <- array(all.evals[1:num.min.rq.stat.evals,2:dim(all.evals)[2]],c(num.min.rq.stat.evals,dim(all.evals)[2]-1))
   min.rq.stat.evals <- min.rq.stat.evals[,!is.na(pars0)]
+  min.rq.stat.evals <- array(matrix(min.rq.stat.evals),c(num.min.rq.stat.evals,dim(all.evals)[2]-1))
+  #min.rq.stat.evals <- as.matrix(min.rq.stat.evals,nrow=num.min.rq.stat.evals,ncol=dim(all.evals)[2]-1,byrow=FALSE)
+  constraints <- get.mv.constraints("cav",is.midas,p)
   constraints$LB <- constraints$LB[!is.na(pars0)]
   constraints$UB <- constraints$UB[!is.na(pars0)]
-  
   if(!mc) est  <-  lapply(1:num.min.rq.stat.evals,get.mv.optimal, 
                           min.rq.stat.evals,theta,p,z,is.midas,quant.type,empirical.quantile,opt.method,constraints)
   if(mc)  est  <-  mclapply(1:num.min.rq.stat.evals,get.mv.optimal, 
                             min.rq.stat.evals,theta,p,z,is.midas,quant.type,empirical.quantile,opt.method,constraints,mc.cores=ncores)
-  return(est)
+  val <- NULL
+  for(j in 1:length(est)){val[j] <- est[[j]]$value }
+  temp <- est[min(val)==val]
+  if(opt.method=="cma-es"){coeff <- temp[[1]]$par}
+  if(opt.method=="nelder-mead"){coeff <- as.numeric(temp[[1]][1:dim(min.rq.stat.evals)[2]])}
+  fit <- compute.mv.quantile(coeff,theta,z,is.midas,out.val=1,quant.type,empirical.quantile)
+  return(fit)
 }
 
 compute.mv.quantile <- function(pars0,theta,z,is.midas,out.val=0,quant.type="var",empirical.quantile) {
@@ -86,7 +92,7 @@ compute.mv.quantile <- function(pars0,theta,z,is.midas,out.val=0,quant.type="var
       k1 <- 1
       k2 <- pars0[length(pars0)]
       pars0 <- pars0[1:length(pars0)-1]
-      nlag <- ncol(z$x.highfreq)
+      nlag <- ncol(X[[i]])
       weights <- beta.poli.w(nlag, k1, k2)
       W <- weights$weights
       Xt[,i] <- (X[[i]]%*%W)
@@ -108,7 +114,7 @@ compute.mv.quantile <- function(pars0,theta,z,is.midas,out.val=0,quant.type="var
     }
     z$hit.stat <- hit.stat
     z$rq.stat <- rq.stat
-    z$residuals <- Y - res$qq
+    z$residuals <- Y - res$q
     z$fitted.values <- res$q
     class(z) <- "dynquant"
   } else if(out.val == 0){

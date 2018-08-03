@@ -14,6 +14,7 @@ is.midas <- TRUE
 opt.method <- "cma-es"
 opt.transform <- c("abs","sq")
 mc <- TRUE
-theta <- c(0.01,0.5)
+theta <- c(0.05,0.5)
 z <- list(y = as.matrix(dataCAViaR[,1:2]))
+dq.options <- NULL
 fit <- fit.mv.dyn.quant(theta,z,type,is.midas,opt.method,opt.transform,mc,quant.type)
