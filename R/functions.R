@@ -64,7 +64,6 @@ fit.mv.dyn.quant <- function(theta,z,type=c("cav"),is.midas,opt.method=c("nelder
   min.rq.stat.evals <- array(all.evals[1:num.min.rq.stat.evals,2:dim(all.evals)[2]],c(num.min.rq.stat.evals,dim(all.evals)[2]-1))
   min.rq.stat.evals <- min.rq.stat.evals[,!is.na(pars0)]
   min.rq.stat.evals <- array(matrix(min.rq.stat.evals),c(num.min.rq.stat.evals,dim(all.evals)[2]-1))
-  #min.rq.stat.evals <- as.matrix(min.rq.stat.evals,nrow=num.min.rq.stat.evals,ncol=dim(all.evals)[2]-1,byrow=FALSE)
   constraints <- get.mv.constraints("cav",is.midas,p)
   constraints$LB <- constraints$LB[!is.na(pars0)]
   constraints$UB <- constraints$UB[!is.na(pars0)]
@@ -116,6 +115,9 @@ compute.mv.quantile <- function(pars0,theta,z,is.midas,out.val=0,quant.type="var
     z$rq.stat <- rq.stat
     z$residuals <- Y - res$q
     z$fitted.values <- res$q
+    z$c <- C
+    z$a <- A
+    z$r <- R
     class(z) <- "dynquant"
   } else if(out.val == 0){
     z <- as.numeric(rq.stat)
