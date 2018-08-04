@@ -4,11 +4,13 @@ setwd('/Users/striaukas/Documents/GitHub/dynquant')
 require('parallel')
 require('optimx')
 require("cmaes")
+#change for testing
+setwd('/Users/striaukas/Documents/GitHub/dynquant')
 #require('ggplot2')
 source('R/functions.R')
 
 set.seed(11)
-load("/Users/striaukas/Dropbox/PhD/Projects/FINMETRICS/Data/dataQuantileMIDAS.RData")
+load("Data/dataQuantileMIDAS.RData")
 type <- "cav"
 quant.type <- "quant"
 is.midas <- TRUE

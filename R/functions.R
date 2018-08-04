@@ -14,14 +14,14 @@ fit.mv.dyn.quant <- function(theta,z,type=c("cav"),is.midas,opt.method=c("nelder
       ncores = dq.options$ncores
     }
   }
-  if(is.null(dq.options$num.min.rq.stat.evals)){dq.options$num.min.rq.stat.evals = 1}
+  if(is.null(dq.options$min.evals)){dq.options$min.evals = 1}
   if (is.midas){
     if (is.null(dq.options$y.lowfreq) || is.null(dq.options$x.highfreq)){
       if (is.null(dq.options$period)){dq.options$period <- 22}
       if (is.null(dq.options$nlag)){dq.options$nlag <- 22}
     } 
   }
-  num.min.rq.stat.evals <- dq.options$num.min.rq.stat.evals
+  min.evals <- dq.options$min.evals
   p <- ncol(z$y)
   if(length(theta)==1){theta=rep(theta,p)}
   if(length(theta)!=p){stop("number of quantile levels must equal to the number of covariates")}
@@ -61,15 +61,15 @@ fit.mv.dyn.quant <- function(theta,z,type=c("cav"),is.midas,opt.method=c("nelder
   rq.stat <- unlist(rq.stat)
   all.evals <- cbind(rq.stat,starting.vals)
   all.evals <- all.evals[order(rq.stat),]
-  min.rq.stat.evals <- array(all.evals[1:num.min.rq.stat.evals,2:dim(all.evals)[2]],c(num.min.rq.stat.evals,dim(all.evals)[2]-1))
+  min.rq.stat.evals <- array(all.evals[1:min.evals,2:dim(all.evals)[2]],c(min.evals,dim(all.evals)[2]-1))
   min.rq.stat.evals <- min.rq.stat.evals[,!is.na(pars0)]
-  min.rq.stat.evals <- array(matrix(min.rq.stat.evals),c(num.min.rq.stat.evals,dim(all.evals)[2]-1))
+  min.rq.stat.evals <- array(matrix(min.rq.stat.evals),c(min.evals,dim(all.evals)[2]-1))
   constraints <- get.mv.constraints("cav",is.midas,p)
   constraints$LB <- constraints$LB[!is.na(pars0)]
   constraints$UB <- constraints$UB[!is.na(pars0)]
-  if(!mc) est  <-  lapply(1:num.min.rq.stat.evals,get.mv.optimal, 
+  if(!mc) est  <-  lapply(1:min.evals,get.mv.optimal, 
                           min.rq.stat.evals,theta,p,z,is.midas,quant.type,empirical.quantile,opt.method,constraints)
-  if(mc)  est  <-  mclapply(1:num.min.rq.stat.evals,get.mv.optimal, 
+  if(mc)  est  <-  mclapply(1:min.evals,get.mv.optimal, 
                             min.rq.stat.evals,theta,p,z,is.midas,quant.type,empirical.quantile,opt.method,constraints,mc.cores=ncores)
   val <- NULL
   for(j in 1:length(est)){val[j] <- est[[j]]$value }
@@ -141,8 +141,8 @@ fit.u.dyn.quant <- function(theta,z,type=c("cav","igarch","adapt","asymslope","r
       ncores = dq.options$ncores
     }
   }
-  if(is.null(dq.options$num.min.rq.stat.evals)){dq.options$num.min.rq.stat.evals = 1}
-  num.min.rq.stat.evals <- dq.options$num.min.rq.stat.evals
+  if(is.null(dq.options$min.evals)){dq.options$min.evals = 1}
+  min.evals <- dq.options$min.evals
   if(is.null(dq.options$empirical.quantile)){
     temp <- sort(z$y,decreasing=FALSE)
     dq.options$empirical.quantile <- temp[100*theta]
@@ -177,12 +177,12 @@ fit.u.dyn.quant <- function(theta,z,type=c("cav","igarch","adapt","asymslope","r
   rq.stat <- unlist(rq.stat)
   all.evals <- cbind(rq.stat,starting.vals)
   all.evals <- all.evals[order(rq.stat),]
-  min.rq.stat.evals <- all.evals[1:dq.options$num.min.rq.stat.evals,2:dim(all.evals)[2]]
-  min.rq.stat.evals <- matrix(as.numeric(min.rq.stat.evals), dq.options$num.min.rq.stat.evals,dim(all.evals)[2]-1)
+  min.rq.stat.evals <- all.evals[1:dq.options$min.evals,2:dim(all.evals)[2]]
+  min.rq.stat.evals <- matrix(as.numeric(min.rq.stat.evals), dq.options$min.evals,dim(all.evals)[2]-1)
   constraints <- get.u.constraints(type,is.midas)
-  if(!mc) est  <-  lapply(1:num.min.rq.stat.evals,get.u.optimal, 
+  if(!mc) est  <-  lapply(1:min.evals,get.u.optimal, 
                           min.rq.stat.evals,theta,z,type,is.midas,quant.type,empirical.quantile,opt.method,constraints)
-  if(mc)  est  <-  mclapply(1:num.min.rq.stat.evals,get.u.optimal, 
+  if(mc)  est  <-  mclapply(1:min.evals,get.u.optimal, 
                             min.rq.stat.evals,theta,z,type,is.midas,quant.type,empirical.quantile,opt.method,constraints,mc.cores=ncores)
   val <- NULL
   for(j in 1:length(est)){val[j] <- est[[j]]$value }
@@ -665,6 +665,48 @@ MixFreqData <- function(DataY,DataYdate,DataX,DataXdate,xlag,ylag,horizon,estSta
   DataXdate <- as.vector(DataXdate)
   
   
+  DataYdateVec <- as.Date(DataYdate)
+  DataXdateVec <- as.Date(DataXdate)
+  
+  estStart <- as.Date(estStart)
+  estEnd <- as.Date(estEnd)
   
   
 }
+
+
+DateFreq <- function(DateVec)
+# DateFreq: Identify data frequency
+#
+# Input Arguments:
+#  %
+# DateVec: T-by-6 R vector format data: [year,month,day,hour,min,sec]
+#
+# Output Arguments:
+#  %
+#% period: length of two consecutive dates
+#%
+#% unit: unit of length measure
+#%       o 1 = year
+#%       o 2 = month
+#%       o 3 = day
+#%       o 4 = hour
+#%       o 5 = minutes
+#%       o 6 = seconds
+#%
+#% Notes:
+#  %
+#% Frequency   period   unit
+#% yearly         1      1  
+#% semiannual     6      2 
+#% quarterly      3      2 
+#% monthly        1      2 
+#% biweekly       14     3
+#% weekly         7      3
+#% daily          1      3
+#% hourly         1      4
+#% minutely       1      5
+#% secondly       1      6
+
+
+return(list(period = period,unit = unit))

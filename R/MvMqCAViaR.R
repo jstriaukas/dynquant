@@ -12,9 +12,10 @@ type <- "cav"
 quant.type <- "quant"
 is.midas <- TRUE
 opt.method <- "cma-es"
-opt.transform <- c("abs","sq")
+opt.transform <- c("abs","abs")
 mc <- TRUE
 theta <- c(0.05,0.05)
-z <- list(y = as.matrix(dataCAViaR[,1:2]))
+z <- list(y = as.matrix(dataCAViaR[,2:3]))
 dq.options <- NULL
-fit <- fit.mv.dyn.quant(theta,z,type,is.midas,opt.method,opt.transform,mc,quant.type)
+min.evals <- 2
+fit <- fit.mv.dyn.quant(theta,z,type,is.midas,opt.method,opt.transform,mc,quant.type,min.evals)
