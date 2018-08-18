@@ -7,12 +7,8 @@ fit.mv.dyn.quant <- function(theta,z,type=c("cav"),is.midas,opt.method=c("nelder
   quant.type <- match.arg(quant.type)
   dq.options <- list(...)
   if(mc){ 
-    if(is.null(dq.options$ncores)) {
-      ncores = detectCores()
-    }
-    else {
-      ncores = dq.options$ncores
-    }
+    if(is.null(dq.options$ncores)) {ncores = detectCores()
+    } else {ncores = dq.options$ncores}
   }
   if(is.null(dq.options$min.evals)){dq.options$min.evals = 1}
   if (is.midas){
@@ -21,14 +17,15 @@ fit.mv.dyn.quant <- function(theta,z,type=c("cav"),is.midas,opt.method=c("nelder
       if (is.null(dq.options$nlag)){dq.options$nlag <- 22}
     } 
   }
-  min.evals <- dq.options$min.evals
-  p <- ncol(z$y)
+  if(is.null(dq.options$num.test)){dq.options$num.test <- 1e3}
   if(length(theta)==1){theta=rep(theta,p)}
   if(length(theta)!=p){stop("number of quantile levels must equal to the number of covariates")}
   if(length(is.midas)==1){is.midas=rep(is.midas,p)}
   if(length(is.midas)>p){stop("number of MIDAS weighted covariates must not exceed total number of covariates")}
   if(length(opt.transform)<p){opt.transform=c(opt.transform,rep("lev",p-length(opt.transform)))}
   if(length(opt.transform)>p){stop("number of transformations exceed total number of covariates")}
+  min.evals <- dq.options$min.evals
+  p <- ncol(z$y)
   Y<-X<-a<-r<-c<-fit.u<-dat<-e.q<-kappa<-NULL
   for(i in 1:p){
     dat$y <- z$y[,i]
@@ -42,10 +39,9 @@ fit.mv.dyn.quant <- function(theta,z,type=c("cav"),is.midas,opt.method=c("nelder
     Y[[i]] <- fit.u[[i]]$Y
     X[[i]] <- fit.u[[i]]$X
   }
-  if(is.null(dq.options$empirical.quantile)){
-    dq.options$empirical.quantile <- e.q
-  }
+  if(is.null(dq.options$empirical.quantile)){dq.options$empirical.quantile <- e.q}
   empirical.quantile <- dq.options$empirical.quantile
+  
   pars0 <- c(c,c(diag(a)),c(diag(r)),c(kappa))
   Y <- matrix(unlist(Y),ncol=p,byrow=FALSE)
   z$Y <- Y
@@ -308,13 +304,13 @@ get.u.optimal <- function(dt,param,theta,z,type,is.midas,quant.type,empirical.qu
   if(is.null(opt.options$rep)) {rep = 10} else {rep <- opt.options$rep}
   if(is.null(opt.options$constraints)) {constraints <- get.u.constraints(type,is.midas)} else {constraints <- opt.options$constraints}
   if(opt.method=="nelder-mead"){
-    est <-  optimx(param[dt,],compute.u.quantile,theta=theta,z=z,type=type,is.midas=is.midas,out.val=0,quant.type=quant.type,empirical.quantile=empirical.quantile,method = c("Nelder-Mead")) 
+    est <-  optimx::optimx(param[dt,],compute.u.quantile,theta=theta,z=z,type=type,is.midas=is.midas,out.val=0,quant.type=quant.type,empirical.quantile=empirical.quantile,method = c("Nelder-Mead")) 
     for (i in 1:rep) {
-      est <-  optimx(as.numeric(est[1:length(param[dt,])]),compute.u.quantile,theta=theta,z=z,type=type,is.midas=is.midas,out.val=0,quant.type=quant.type,empirical.quantile=empirical.quantile,method = c("Nelder-Mead"))
+      est <-  optimx::optimx(as.numeric(est[1:length(param[dt,])]),compute.u.quantile,theta=theta,z=z,type=type,is.midas=is.midas,out.val=0,quant.type=quant.type,empirical.quantile=empirical.quantile,method = c("Nelder-Mead"))
     }
-    est <-  optimx(as.numeric(est[1:length(param[dt,])]),compute.u.quantile,theta=theta,z=z,type=type,is.midas=is.midas,out.val=0,quant.type=quant.type,empirical.quantile=empirical.quantile,method = c("Nelder-Mead"))
+    est <-  optimx::optimx(as.numeric(est[1:length(param[dt,])]),compute.u.quantile,theta=theta,z=z,type=type,is.midas=is.midas,out.val=0,quant.type=quant.type,empirical.quantile=empirical.quantile,method = c("Nelder-Mead"))
   } else if(opt.method=="cma-es"){
-    est <- cma_es(param[dt,],compute.u.quantile,theta=theta,z=z,type=type,is.midas=is.midas,out.val=0,quant.type=quant.type,empirical.quantile=empirical.quantile,lower=constraints$LB,upper=constraints$UB)
+    est <- cmaes::cma_es(param[dt,],compute.u.quantile,theta=theta,z=z,type=type,is.midas=is.midas,out.val=0,quant.type=quant.type,empirical.quantile=empirical.quantile,lower=constraints$LB,upper=constraints$UB)
   }
   
   return(est = est)
@@ -327,13 +323,13 @@ get.mv.optimal <- function(dt,param,theta,p,z,is.midas,quant.type,empirical.quan
   if(is.null(opt.options$rep)) {rep = 10} else {rep <- opt.options$rep}
   if(is.null(opt.options$constraints)) {constraints <- get.mv.constraints("cav",is.midas,p)} else {constraints <- opt.options$constraints}
   if(opt.method=="nelder-mead"){ #
-    est <-  optimx(param[dt,],compute.mv.quantile,theta=theta,z=z,is.midas=is.midas,out.val=0,quant.type=quant.type,empirical.quantile=empirical.quantile,method = c("Nelder-Mead")) 
+    est <-  optimx::optimx(param[dt,],compute.mv.quantile,theta=theta,z=z,is.midas=is.midas,out.val=0,quant.type=quant.type,empirical.quantile=empirical.quantile,method = c("Nelder-Mead")) 
     for (i in 1:rep) {
-      est <-  optimx(as.numeric(est[1:length(param[dt,])]),compute.mv.quantile,theta=theta,z=z,is.midas=is.midas,out.val=0,quant.type=quant.type,empirical.quantile=empirical.quantile,method = c("Nelder-Mead"))
+      est <-  optimx::optimx(as.numeric(est[1:length(param[dt,])]),compute.mv.quantile,theta=theta,z=z,is.midas=is.midas,out.val=0,quant.type=quant.type,empirical.quantile=empirical.quantile,method = c("Nelder-Mead"))
     }
-    est <-  optimx(as.numeric(est[1:length(param[dt,])]),compute.mv.quantile,theta=theta,z=z,is.midas=is.midas,out.val=0,quant.type=quant.type,empirical.quantile=empirical.quantile,method = c("Nelder-Mead"))
+    est <-  optimx::optimx(as.numeric(est[1:length(param[dt,])]),compute.mv.quantile,theta=theta,z=z,is.midas=is.midas,out.val=0,quant.type=quant.type,empirical.quantile=empirical.quantile,method = c("Nelder-Mead"))
   } else if(opt.method=="cma-es"){
-    est <- cma_es(param[dt,],compute.mv.quantile,theta=theta,z=z,is.midas=is.midas,out.val=0,quant.type=quant.type,empirical.quantile=empirical.quantile,lower=constraints$LB,upper=constraints$UB)
+    est <- cmaes::cma_es(param[dt,],compute.mv.quantile,theta=theta,z=z,is.midas=is.midas,out.val=0,quant.type=quant.type,empirical.quantile=empirical.quantile,lower=constraints$LB,upper=constraints$UB)
   }
   
   return(est = est)
@@ -647,66 +643,3 @@ get.mv.initial <- function(pars0,type,is.midas,p,num.test=1e3){
   return(starting.vals)
 }
 
-MixFreqData <- function(DataY,DataYdate,DataX,DataXdate,xlag,ylag,horizon,estStart,estEnd,dispFlag) {
-  # complete data
-  mask.na <- !is.na(DataY)
-  mask.nan <- !is.nan(DataY)
-  mask <- mask.na*mask.nan
-  DataY <- DataY(mask)
-  DataYdate = DataYdate(mask)
-  mask.na <- !is.na(DataX)
-  mask.nan <- !is.nan(DataX)
-  mask <- mask.na*mask.nan
-  DataX <- DataX(mask)
-  DataXdate <- DataXdate(mask)
-  DataY <- as.vector(DataY)
-  DataYdate <- as.vector(DataYdate)
-  DataX <- as.vector(DataX)
-  DataXdate <- as.vector(DataXdate)
-  
-  
-  DataYdateVec <- as.Date(DataYdate)
-  DataXdateVec <- as.Date(DataXdate)
-  
-  estStart <- as.Date(estStart)
-  estEnd <- as.Date(estEnd)
-  
-  
-}
-
-
-DateFreq <- function(DateVec)
-# DateFreq: Identify data frequency
-#
-# Input Arguments:
-#  %
-# DateVec: T-by-6 R vector format data: [year,month,day,hour,min,sec]
-#
-# Output Arguments:
-#  %
-#% period: length of two consecutive dates
-#%
-#% unit: unit of length measure
-#%       o 1 = year
-#%       o 2 = month
-#%       o 3 = day
-#%       o 4 = hour
-#%       o 5 = minutes
-#%       o 6 = seconds
-#%
-#% Notes:
-#  %
-#% Frequency   period   unit
-#% yearly         1      1  
-#% semiannual     6      2 
-#% quarterly      3      2 
-#% monthly        1      2 
-#% biweekly       14     3
-#% weekly         7      3
-#% daily          1      3
-#% hourly         1      4
-#% minutely       1      5
-#% secondly       1      6
-
-
-return(list(period = period,unit = unit))
