@@ -9,14 +9,11 @@ mixed.freq.data.single <- function(data.refdate,data.x,data.xdate,x.lag,horizon,
   data.x <- as.vector(data.x)
   data.xdate <- as.Date(data.xdate)
   
-  
   data.refdate.vec <- as.Date(data.refdate)
   data.xdate.vec <- as.Date(data.xdate)
   
-  
   est.start <- as.Date(est.start)
   est.end <- as.Date(est.end)
-  
   
   data.refdate.vec <- date.vec(data.refdate.vec)
   data.xdate.vec <- date.vec(data.xdate.vec)
@@ -31,7 +28,6 @@ mixed.freq.data.single <- function(data.refdate,data.x,data.xdate,x.lag,horizon,
   period.x <- data.freq(data.xdate.vec)$period  
   unit.x <- data.freq(data.xdate.vec)$unit
   
-  
   ref.lag <- lag.num(1,period.ref,unit.ref)
   x.lag <- lag.num(x.lag,period.x,unit.x)
   horizon <- lag.num(horizon,period.x,unit.x)
@@ -41,7 +37,6 @@ mixed.freq.data.single <- function(data.refdate,data.x,data.xdate,x.lag,horizon,
   if (x.lag < 0) {
     stop('x.lag cannot be negative')
   }
-  
   # Minimum and maximum dates that data support
   min.date.ref <- data.refdate.num[ref.lag+1]
   min.date.x <- data.xdate.num[max(1,x.lag+horizon)]
@@ -66,15 +61,15 @@ mixed.freq.data.single <- function(data.refdate,data.x,data.xdate,x.lag,horizon,
   # Check and set default sample period
   if (is.null(est.start)){
     est.start <- min.date
-  } else { if(est.start < min.date) {warning('Start date cannot be earlier than possible due to lagged regressors. Reset start date to most recent possible.')
+  } else { if(est.start < min.date) {warning('Start date cannot be earlier than possible due to lagged regressors. Reset start date to most recent possible: ', paste(min.date))
     est.start <- min.date}
   }
   if (is.null(est.end)){
     est.end <- max.date
-  } else { if(est.end > max.date) {warning('Terminal date cannot be later than largest date account for lags. Reset to largest date.')
+  } else { if(est.end > max.date) {warning('Terminal date cannot be later than largest date account for lags. Reset to largest date possible: ', paste(max.date))
     est.end <- max.date}
   }
-  # Construct Y data
+  # Construct reference date data
   tol <- 1e-10
   loc.start <- min(which((data.refdate.num >= est.start-tol) == TRUE))
   loc.end <- min(which((data.refdate.num >= est.end-tol) == TRUE)) 
@@ -106,7 +101,7 @@ mixed.freq.data.single <- function(data.refdate,data.x,data.xdate,x.lag,horizon,
       est.x = est.x[seq(1,nobs,1)]
       est.xdate = est.xdate[seq(1,nobs,1)]
       max.date = est.refdate[length(est.refdate)]
-      warning('Horizon is a large negative number. Observations are further truncated to max date possible')
+      warning('Horizon is a large negative number. Observations are further truncated to max date possible: ', paste(max.date))
       break
     } else  {      
       est.x[t,] <- data.x[seq(loc-horizon,loc-horizon-x.lag+1,-1)]
