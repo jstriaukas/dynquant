@@ -1,237 +1,384 @@
-rm(list = ls())
-
-EstY <- read.csv("~/Documents/GitHub/dynquant/R/EstY.txt", sep="")
-EstYdate.imp <- read.table("~/Documents/GitHub/dynquant/R/EstYdate.csv", quote="\"", comment.char="")
-EstX <- read.csv("~/Documents/GitHub/dynquant/R/EstX.txt", sep="")
-EstXdate.imp <- read.table("~/Documents/GitHub/dynquant/R/EstXdate.csv", quote="\"", comment.char="")
-
-EstYdate <- EstXdate <- NULL
-
-for (i in 1:dim(EstYdate.imp)[1]) {
-  EstYdate[i] <- as.Date(EstYdate.imp[i,], origin = "1899-12-30") 
-}
-EstYdate <- as.Date(EstYdate, origin = "1970-01-01")
-for (j in 1:dim(EstXdate.imp)[1]) {
-  EstXdate[j] <- as.Date(EstXdate.imp[j,], origin = "1899-12-30") 
-}
-EstXdate <- as.Date(EstXdate, origin = "1970-01-01")
-
-
-DataY <- EstY 
-DataYdate <- EstYdate
-DataX <- EstX
-DataXdate <- EstXdate
-
-estStart <-  as.Date('1964-02-01')
-estEnd   <- as.Date('2017-09-01')
-
-xlag <- 66
-ylag <- 1
-horizon <- '1d'
-
-data <- MixFreqData(DataY,DataYdate,DataX,DataXdate,xlag,ylag,horizon,estStart,estEnd)
-
-MixFreqData <- function(DataY,DataYdate,DataX,DataXdate,xlag,ylag,horizon,estStart,estEnd,dispFlag=TRUE) {
+mixed.freq.data.single <- function(data.refdate,data.x,data.xdate,x.lag,horizon,est.start,est.end,disp.flag=TRUE) {
   # complete data
-  mask.na <- !is.na(DataY)
-  DataY <- DataY[mask.na]
-  DataYdate <- DataYdate[mask.na]
-  mask.na <- !is.na(DataX)
-  DataX <- DataX[mask.na]
-  DataXdate <- DataXdate[mask.na]
-  DataY <- as.vector(DataY)
-  DataYdate <- as.Date(DataYdate)
-  DataX <- as.vector(DataX)
-  DataXdate <- as.Date(DataXdate)
+  mask.na <- !is.na(data.refdate)
+  data.refdate <- data.refdate[mask.na]
+  mask.na <- !is.na(data.x)
+  data.x <- data.x[mask.na]
+  data.xdate <- data.xdate[mask.na]
+  data.refdate <- as.Date(data.refdate)
+  data.x <- as.vector(data.x)
+  data.xdate <- as.Date(data.xdate)
   
   
-  DataYdateVec <- as.Date(DataYdate)
-  DataXdateVec <- as.Date(DataXdate)
+  data.refdate.vec <- as.Date(data.refdate)
+  data.xdate.vec <- as.Date(data.xdate)
   
   
-  estStart <- as.Date(estStart)
-  estEnd <- as.Date(estEnd)
+  est.start <- as.Date(est.start)
+  est.end <- as.Date(est.end)
   
   
-  DataYdateVec <- DatevecV(DataYdateVec)
-  DataXdateVec <- DatevecV(DataXdateVec)
-  DataYdateVec <- matrix(unlist(DataYdateVec),nrow=length(DataYdate))
-  DataXdateVec <- matrix(unlist(DataXdateVec),nrow=length(DataXdate))
-  DataYdateNum <- DataYdate
-  DataXdateNum <- DataXdate
-  Yinfo <- DateFreq(DataYdateVec)
-  periodY <-Yinfo$period  
-  unitY <- Yinfo$unit
+  data.refdate.vec <- date.vec(data.refdate.vec)
+  data.xdate.vec <- date.vec(data.xdate.vec)
+  data.refdate.vec <- matrix(unlist(data.refdate.vec),nrow=length(data.refdate))
+  data.xdate.vec <- matrix(unlist(data.xdate.vec),nrow=length(data.xdate))
+  data.refdate.num <- data.refdate
+  data.xdate.num <- data.xdate
   
-  dateFormat = c('year(s)','month(s)','day(s)','hour(s)','minute(s)','second(s)')
-  Xinfo <- DateFreq(DataXdateVec)
-  periodX <- Xinfo$period  
-  unitX <- Xinfo$unit
-  ylag <- lagNum(ylag,periodY,unitY)
-  xlag <- lagNum(xlag,periodX,unitX)
-  horizon <- lagNum(horizon,periodX,unitX)
-  if (ylag < 0){
-  stop('ylag cannot be negative.')
+  date.format = c('year(s)','month(s)','day(s)','hour(s)','minute(s)','second(s)')
+  period.ref <- data.freq(data.refdate.vec)$period 
+  unit.ref <- data.freq(data.refdate.vec)$unit 
+  period.x <- data.freq(data.xdate.vec)$period  
+  unit.x <- data.freq(data.xdate.vec)$unit
+  
+  
+  ref.lag <- lag.num(1,period.ref,unit.ref)
+  x.lag <- lag.num(x.lag,period.x,unit.x)
+  horizon <- lag.num(horizon,period.x,unit.x)
+  if (ref.lag < 0){
+    stop('ref.lag cannot be negative.')
   }
-  if (xlag < 0) {
-  stop('xlag cannot be negative')
+  if (x.lag < 0) {
+    stop('x.lag cannot be negative')
   }
   
   # Minimum and maximum dates that data support
-  minDateY <- DataYdateNum[ylag+1]
-  minDateX <- DataXdateNum[max(1,xlag+horizon)]
-  if (minDateY > minDateX){
-    minDate <- minDateY
+  min.date.ref <- data.refdate.num[ref.lag+1]
+  min.date.x <- data.xdate.num[max(1,x.lag+horizon)]
+  if (min.date.ref > min.date.x){
+    min.date <- min.date.ref
   } else {
-    minDate <- minDateX
+    min.date <- min.date.x
   }
-  maxDateY <- DataYdateNum[length(DataYdateNum)]
-  maxDateX = DataXdateNum[length(DataXdateNum)]
+  max.date.ref <- data.refdate.num[length(data.refdate.num)]
+  max.date.x = data.xdate.num[length(data.xdate.num)]
   if (horizon < 0){
-  maxDateX <- DataXdateVec[dim(DataXdateVec)[1],]
-  maxDateX[unitX] <- maxDateX[unitX] + periodX * horizon
-  maxDateX <- ISOdate(maxDateX[1],maxDateX[2],maxDateX[3],maxDateX[4],maxDateX[5],maxDateX[6])
-  maxDateX <- as.Date(maxDateX)
+    max.date.x <- data.xdate.vec[dim(data.xdate.vec)[1],]
+    max.date.x[unit.x] <- max.date.x[unit.x] + period.x * horizon
+    max.date.x <- ISOdate(max.date.x[1],max.date.x[2],max.date.x[3],max.date.x[4],max.date.x[5],max.date.x[6])
+    max.date.x <- as.Date(max.date.x)
   }
-  if (maxDateY > maxDateX){
-  maxDate <- maxDateX
+  if (max.date.ref > max.date.x){
+    max.date <- max.date.x
   } else {
-    maxDate <- maxDateY
+    max.date <- max.date.ref
   }
   # Check and set default sample period
-  if (is.null(estStart)){
-  estStart <- minDate
-  } else { if(estStart < minDate) {warning('Start date cannot be earlier than possible due to lagged regressors. Reset start date to most recent possible.')
-    estStart <- minDate}
+  if (is.null(est.start)){
+    est.start <- min.date
+  } else { if(est.start < min.date) {warning('Start date cannot be earlier than possible due to lagged regressors. Reset start date to most recent possible.')
+    est.start <- min.date}
   }
-  if (is.null(estEnd)){
-  estEnd <- maxDate
-  } else { if(estEnd > maxDate) {warning('Terminal date cannot be later than largest date account for lags. Reset to largest date.')
-    estEnd <- maxDate}
+  if (is.null(est.end)){
+    est.end <- max.date
+  } else { if(est.end > max.date) {warning('Terminal date cannot be later than largest date account for lags. Reset to largest date.')
+    est.end <- max.date}
   }
   # Construct Y data
   tol <- 1e-10
-  locStart <- min(which((DataYdateNum >= estStart-tol) == TRUE))
-  locEnd <- min(which((DataYdateNum >= estEnd-tol) == TRUE)) 
-  EstY <- DataY[locStart:locEnd]
-  EstYdate <- DataYdateNum[locStart:locEnd]
+  loc.start <- min(which((data.refdate.num >= est.start-tol) == TRUE))
+  loc.end <- min(which((data.refdate.num >= est.end-tol) == TRUE)) 
+  est.refdate <- data.refdate.num[loc.start:loc.end]
   
-  locForecastEnd <- min(which((DataYdateNum >= maxDate-tol) == TRUE))
-  if(locEnd+1<=locForecastEnd){
-    OutY <- DataY[seq(locEnd+1,locForecastEnd,by=1)]
-    OutYdate <- DataYdateNum[seq(locEnd+1,locForecastEnd,by=1)]
-    nforecast <- length(OutY)
+  loc.forecast.end <- min(which((data.refdate.num >= max.date-tol) == TRUE))
+  if(loc.end+1<=loc.forecast.end){
+    out.refdate <- data.refdate.num[seq(loc.end+1,loc.forecast.end,by=1)]
+    n.forecast <- length(out.refdate)
   } else {
-    OutX <- OutXdate <- NULL
-    nforecast <- length(OutY)
+    out.refdate <- NULL
+    n.forecast <- length(out.refdate)
   }
-  nobs <- locEnd - locStart + 1
-  # Construct lagged Y data
-  EstLagY <- EstLagYdate <- matrix(NaN,nrow=nobs,ncol=ylag)
-  for (m in 1:ylag){
-  EstLagY[,m] <- DataY[seq(locStart-m,locEnd-m,1)]
-  EstLagYdate[,m] <- DataYdateNum[seq(locStart-m,locEnd-m,1)]
-  }
-  OutLagY <- OutLagYdate <- matrix(NaN,nrow=nforecast,ncol=ylag) 
-  for (m in 1:ylag){
-  OutLagY[,m] <- DataY[seq(locEnd-m,locForecastEnd-m,1)]
-  OutLagYdate[,m] <- DataYdateNum[seq(locEnd-m,locForecastEnd-m,1)]
-  }
+  nobs <- loc.end - loc.start + 1
   
-  EstX <- EstXdate <- matrix(NaN,nrow=nobs,ncol=xlag) 
+  est.x <- est.xdate <- matrix(NaN,nrow=nobs,ncol=x.lag) 
   for (t in 1:nobs){
-  loc <- min(which((DataXdateNum >= EstYdate[t]-tol) == TRUE)) 
-  if (is.null(loc)) {
-  loc <- length(DataXdateNum)
+    loc <- min(which((data.xdate.num >= est.refdate[t]-tol) == TRUE)) 
+    if (is.null(loc)) {
+      loc <- length(data.xdate.num)
+    }
+    
+    if(loc-horizon > length(data.x)){    
+      nobs <- t - 1
+      est.ref = est.ref[seq(1,nobs,1)]
+      est.refdate = est.refdate[seq(1,nobs,1)]
+      est.lag.ref = est.lag.ref[seq(1,nobs,1)]
+      est.lag.refdate = est.lag.refdate[seq(1,nobs,1)]
+      est.x = est.x[seq(1,nobs,1)]
+      est.xdate = est.xdate[seq(1,nobs,1)]
+      max.date = est.refdate[length(est.refdate)]
+      warning('Horizon is a large negative number. Observations are further truncated to max date possible')
+      break
+    } else  {      
+      est.x[t,] <- data.x[seq(loc-horizon,loc-horizon-x.lag+1,-1)]
+      est.xdate[t,] <- data.xdate.num[seq(loc-horizon,loc-horizon-x.lag+1,-1)]
+    }
+  }
+  if(loc.end+1<=loc.forecast.end){
+    out.x <- out.xdate <- matrix(NaN,nrow=n.forecast,ncol=x.lag) 
+    for(t in 1:n.forecast){
+      loc <- min(which((data.xdate.num >= out.refdate[t]-tol) == TRUE))  
+      if (is.null(loc)) {
+        loc <- length(data.xdate.num)
+      }
+      
+      if(loc-horizon > length(data.x)){      
+        n.forecast <- t - 1
+        out.ref = out.ref[seq(1,n.forecast,1)]
+        out.refdate = out.refdate[seq(1,n.forecast,1)]
+        out.lag.ref = out.lag.ref[seq(1,n.forecast,1)]
+        out.lag.refdate = out.lag.refdate[seq(1,n.forecast,1)]
+        out.x = out.x[seq(1,n.forecast,1)]
+        out.xdate = out.xdate[seq(1,n.forecast,1)]
+        break
+      } else {
+        out.x[t,] <- data.x[seq(loc-horizon,loc-horizon-x.lag+1,-1)] 
+        out.xdate[t,] <- data.xdate.num[seq(loc-horizon,loc-horizon-x.lag+1,-1)] 
+      } 
+    }
+  } else {
+    out.x <- out.xdate <- NULL
   }
   
-  if(loc-horizon > length(DataX)){    
+  if (disp.flag==T){
+    # Display mixed frequency data
+    cat('Frequency of Reference Date:',period.ref,date.format[unit.ref], "\n") 
+    cat('Frequency of Data X:',period.x,date.format[unit.x], "\n") 
+    cat('Start Date: ', paste(est.start), "\n") 
+    cat('Terminal Date: ', paste(est.end), "\n") 
+    
+    # Display timeframe of mixed frequency regression
+    cat('Mixed frequency data structure time frame:', "\n") 
+    for(m in c(1,2,nobs)){
+      cat("\n")
+      cat(paste('Ref date(',as.Date(est.refdate[m],origin="1970-01-01"),')`s on: ', sep="")) 
+      if (x.lag == 1) {
+        cat(paste(' X(',as.Date(est.xdate[m],origin="1970-01-01"),')`s', sep="")) 
+      }
+      if (x.lag == 2){
+        cat(paste(' X(',as.Date(est.xdate[m,1],origin="1970-01-01"),')`s X(',as.Date(est.xdate[m,dim(est.xdate)[2]],origin="1970-01-01"),')`s', sep=""))  
+      }
+      if (x.lag == 3) {
+        cat(paste(' X(',as.Date(est.xdate[m,1],origin="1970-01-01"),')`s X(',as.Date(est.xdate[m,2],origin="1970-01-01"),')`s X(',as.Date(est.xdate[m,dim(est.xdate)[2]],origin="1970-01-01"),')`s', sep=""))  
+      }
+      if (x.lag > 3){
+        cat(paste(' X(',as.Date(est.xdate[m,1],origin="1970-01-01"),')`s X(',as.Date(est.xdate[m,2],origin="1970-01-01"),')`s ... X(',as.Date(est.xdate[m,dim(est.xdate)[2]],origin="1970-01-01"),')`s', sep=""))  
+      }
+    }
+  }
+  output = list(est.refdate = est.refdate, est.x = est.x, est.xdate = est.xdate,
+                out.refdate = out.refdate, out.x = out.x, out.xdate = out.xdate,
+                x.lag = x.lag,min.date = min.date, max.date = max.date)
+  return(output)
+}
+
+
+
+mixed.freq.data <- function(data.y,data.ydate,data.x,data.xdate,x.lag,y.lag,horizon,est.start,est.end,disp.flag=TRUE) {
+  # complete data
+  mask.na <- !is.na(data.y)
+  data.y <- data.y[mask.na]
+  data.ydate <- data.ydate[mask.na]
+  mask.na <- !is.na(data.x)
+  data.x <- data.x[mask.na]
+  data.xdate <- data.xdate[mask.na]
+  data.y <- as.vector(data.y)
+  data.ydate <- as.Date(data.ydate)
+  data.x <- as.vector(data.x)
+  data.xdate <- as.Date(data.xdate)
+  
+  
+  data.ydate.vec <- as.Date(data.ydate)
+  data.xdate.vec <- as.Date(data.xdate)
+  
+  
+  est.start <- as.Date(est.start)
+  est.end <- as.Date(est.end)
+  
+  
+  data.ydate.vec <- date.vec(data.ydate.vec)
+  data.xdate.vec <- date.vec(data.xdate.vec)
+  data.ydate.vec <- matrix(unlist(data.ydate.vec),nrow=length(data.ydate))
+  data.xdate.vec <- matrix(unlist(data.xdate.vec),nrow=length(data.xdate))
+  data.ydate.num <- data.ydate
+  data.xdate.num <- data.xdate
+  
+  date.format = c('year(s)','month(s)','day(s)','hour(s)','minute(s)','second(s)')
+  period.y <- data.freq(data.ydate.vec)$period 
+  unit.y <- data.freq(data.ydate.vec)$unit 
+  period.x <- data.freq(data.xdate.vec)$period  
+  unit.x <- data.freq(data.xdate.vec)$unit
+  
+  
+  y.lag <- lag.num(y.lag,period.y,unit.y)
+  x.lag <- lag.num(x.lag,period.x,unit.x)
+  horizon <- lag.num(horizon,period.x,unit.x)
+  if (y.lag < 0){
+  stop('y.lag cannot be negative.')
+  }
+  if (x.lag < 0) {
+  stop('x.lag cannot be negative')
+  }
+  
+  # Minimum and maximum dates that data support
+  min.date.y <- data.ydate.num[y.lag+1]
+  min.date.x <- data.xdate.num[max(1,x.lag+horizon)]
+  if (min.date.y > min.date.x){
+    min.date <- min.date.y
+  } else {
+    min.date <- min.date.x
+  }
+  max.date.y <- data.ydate.num[length(data.ydate.num)]
+  max.date.x = data.xdate.num[length(data.xdate.num)]
+  if (horizon < 0){
+  max.date.x <- data.xdate.vec[dim(data.xdate.vec)[1],]
+  max.date.x[unit.x] <- max.date.x[unit.x] + period.x * horizon
+  max.date.x <- ISOdate(max.date.x[1],max.date.x[2],max.date.x[3],max.date.x[4],max.date.x[5],max.date.x[6])
+  max.date.x <- as.Date(max.date.x)
+  }
+  if (max.date.y > max.date.x){
+  max.date <- max.date.x
+  } else {
+    max.date <- max.date.y
+  }
+  # Check and set default sample period
+  if (is.null(est.start)){
+  est.start <- min.date
+  } else { if(est.start < min.date) {warning('Start date cannot be earlier than possible due to lagged regressors. Reset start date to most recent possible.')
+    est.start <- min.date}
+  }
+  if (is.null(est.end)){
+  est.end <- max.date
+  } else { if(est.end > max.date) {warning('Terminal date cannot be later than largest date account for lags. Reset to largest date.')
+    est.end <- max.date}
+  }
+  # Construct Y data
+  tol <- 1e-10
+  loc.start <- min(which((data.ydate.num >= est.start-tol) == TRUE))
+  loc.end <- min(which((data.ydate.num >= est.end-tol) == TRUE)) 
+  est.y <- data.y[loc.start:loc.end]
+  est.ydate <- data.ydate.num[loc.start:loc.end]
+  
+  loc.forecast.end <- min(which((data.ydate.num >= max.date-tol) == TRUE))
+  if(loc.end+1<=loc.forecast.end){
+    out.y <- data.y[seq(loc.end+1,loc.forecast.end,by=1)]
+    out.ydate <- data.ydate.num[seq(loc.end+1,loc.forecast.end,by=1)]
+    n.forecast <- length(out.y)
+  } else {
+    out.y <- out.ydate <- NULL
+    n.forecast <- length(out.y)
+  }
+  nobs <- loc.end - loc.start + 1
+  # Construct lagged Y data
+  est.lag.y <- est.lag.ydate <- matrix(NaN,nrow=nobs,ncol=y.lag)
+  for (m in 1:y.lag){
+  est.lag.y[,m] <- data.y[seq(loc.start-m,loc.end-m,1)]
+  est.lag.ydate[,m] <- data.ydate.num[seq(loc.start-m,loc.end-m,1)]
+  }
+  
+  if(loc.end+1<=loc.forecast.end){
+  out.lag.y <- out.lag.ydate <- matrix(NaN,nrow=n.forecast,ncol=y.lag) 
+  for (m in 1:y.lag){
+  out.lag.y[,m] <- data.y[seq(loc.end-m,loc.forecast.end-m,1)]
+  out.lag.ydate[,m] <- data.ydate.num[seq(loc.end-m,loc.forecast.end-m,1)]
+  }
+  } else {
+    out.lag.y <- out.lag.ydate <- NULL
+  }
+  
+  est.x <- est.xdate <- matrix(NaN,nrow=nobs,ncol=x.lag) 
+  for (t in 1:nobs){
+  loc <- min(which((data.xdate.num >= est.ydate[t]-tol) == TRUE)) 
+  if (is.null(loc)) {
+  loc <- length(data.xdate.num)
+  }
+  
+  if(loc-horizon > length(data.x)){    
   nobs <- t - 1
-  EstY = EstY[seq(1,nobs,1)]
-  EstYdate = EstYdate[seq(1,nobs,1)]
-  EstLagY = EstLagY[seq(1,nobs,1)]
-  EstLagYdate = EstLagYdate[seq(1,nobs,1)]
-  EstX = EstX[seq(1,nobs,1)]
-  EstXdate = EstXdate[seq(1,nobs,1)]
-  maxDate = EstYdate[length(EstYdate)]
+  est.y = est.y[seq(1,nobs,1)]
+  est.ydate = est.ydate[seq(1,nobs,1)]
+  est.lag.y = est.lag.y[seq(1,nobs,1)]
+  est.lag.ydate = est.lag.ydate[seq(1,nobs,1)]
+  est.x = est.x[seq(1,nobs,1)]
+  est.xdate = est.xdate[seq(1,nobs,1)]
+  max.date = est.ydate[length(est.ydate)]
   warning('Horizon is a large negative number. Observations are further truncated to max date possible')
   break
   } else  {      
-    EstX[t,] <- DataX[seq(loc-horizon,loc-horizon-xlag+1,-1)]
-    EstXdate[t,] <- DataXdateNum[seq(loc-horizon,loc-horizon-xlag+1,-1)]
+    est.x[t,] <- data.x[seq(loc-horizon,loc-horizon-x.lag+1,-1)]
+    est.xdate[t,] <- data.xdate.num[seq(loc-horizon,loc-horizon-x.lag+1,-1)]
     }
   }
-  if(locEnd+1<=locForecastEnd){
-  OutX <- OutXdate <- matrix(NaN,nrow=nforecast,ncol=xlag) 
-  for(t in 1:nforecast){
-  loc <- min(which((DataXdateNum >= OutYdate[t]-tol) == TRUE))  
+  if(loc.end+1<=loc.forecast.end){
+  out.x <- out.xdate <- matrix(NaN,nrow=n.forecast,ncol=x.lag) 
+  for(t in 1:n.forecast){
+  loc <- min(which((data.xdate.num >= out.ydate[t]-tol) == TRUE))  
   if (is.null(loc)) {
-    loc <- length(DataXdateNum)
+    loc <- length(data.xdate.num)
   }
   
-  if(loc-horizon > length(DataX)){      
-  nforecast <- t - 1
-  OutY = OutY[seq(1,nforecast,1)]
-  OutYdate = OutYdate[seq(1,nforecast,1)]
-  OutLagY = OutLagY[seq(1,nforecast,1)]
-  OutLagYdate = OutLagYdate[seq(1,nforecast,1)]
-  OutX = OutX[seq(1,nforecast,1)]
-  OutXdate = OutXdate[seq(1,nforecast,1)]
+  if(loc-horizon > length(data.x)){      
+  n.forecast <- t - 1
+  out.y = out.y[seq(1,n.forecast,1)]
+  out.ydate = out.ydate[seq(1,n.forecast,1)]
+  out.lag.y = out.lag.y[seq(1,n.forecast,1)]
+  out.lag.ydate = out.lag.ydate[seq(1,n.forecast,1)]
+  out.x = out.x[seq(1,n.forecast,1)]
+  out.xdate = out.xdate[seq(1,n.forecast,1)]
   break
   } else {
-    OutX[t,] <- DataX[seq(loc-horizon,loc-horizon-xlag+1,-1)] 
-    OutXdate[t,] <- DataXdateNum[seq(loc-horizon,loc-horizon-xlag+1,-1)] 
+    out.x[t,] <- data.x[seq(loc-horizon,loc-horizon-x.lag+1,-1)] 
+    out.xdate[t,] <- data.xdate.num[seq(loc-horizon,loc-horizon-x.lag+1,-1)] 
   } 
   }
   } else {
-    OutX <- OutXdate <- NULL
+    out.x <- out.xdate <- NULL
   }
   
-  if (dispFlag==T){
+  if (disp.flag==T){
   # Display mixed frequency data
-  cat('Frequency of Data Y:',periodY,dateFormat[unitY], "\n") 
-  cat('Frequency of Data X:',periodX,dateFormat[unitX], "\n") 
-  cat('Start Date: ', paste(estStart), "\n") 
-  cat('Terminal Date: ', paste(estEnd), "\n") 
+  cat('Frequency of Data Y:',period.y,date.format[unit.y], "\n") 
+  cat('Frequency of Data X:',period.x,date.format[unit.x], "\n") 
+  cat('Start Date: ', paste(est.start), "\n") 
+  cat('Terminal Date: ', paste(est.end), "\n") 
   
   # Display timeframe of mixed frequency regression
   cat('Mixed frequency regression time frame:', "\n") 
   for(m in c(1,2,nobs)){
     cat("\n")
-    cat(paste('Reg Y(',as.Date(EstYdate[m],origin="1970-01-01"),')`s on: ', sep="")) 
-  if (ylag == 1){
-    cat(paste('Y(',as.Date(EstLagYdate[m,],origin="1970-01-01"),')`s', sep="")) 
+    cat(paste('Reg Y(',as.Date(est.ydate[m],origin="1970-01-01"),')`s on: ', sep="")) 
+  if (y.lag == 1){
+    cat(paste('Y(',as.Date(est.lag.ydate[m,],origin="1970-01-01"),')`s', sep="")) 
   }
-  if (ylag == 2){
-    cat(paste('Y(',as.Date(EstLagYdate[m,],origin="1970-01-01"),')`s Y(',as.Date(EstLagYdate[m,dim(EstLagYdate)[2]],origin="1970-01-01"),')`s', sep=""))  
+  if (y.lag == 2){
+    cat(paste('Y(',as.Date(est.lag.ydate[m,],origin="1970-01-01"),')`s Y(',as.Date(est.lag.ydate[m,dim(est.lag.ydate)[2]],origin="1970-01-01"),')`s', sep=""))  
   }
-  if (ylag > 2){
-    cat(paste('Y(',as.Date(EstLagYdate[m,],origin="1970-01-01"),')`s ... Y(',as.Date(EstLagYdate[m,dim(EstLagYdate)[2]],origin="1970-01-01"),')`s', sep=""))  
+  if (y.lag > 2){
+    cat(paste('Y(',as.Date(est.lag.ydate[m,],origin="1970-01-01"),')`s ... Y(',as.Date(est.lag.ydate[m,dim(est.lag.ydate)[2]],origin="1970-01-01"),')`s', sep=""))  
   }
-  if (xlag == 1) {
-    cat(paste(' X(',as.Date(EstXdate[m],origin="1970-01-01"),')`s', sep="")) 
+  if (x.lag == 1) {
+    cat(paste(' X(',as.Date(est.xdate[m],origin="1970-01-01"),')`s', sep="")) 
   }
-  if (xlag == 2){
-    cat(paste(' X(',as.Date(EstXdate[m,1],origin="1970-01-01"),')`s X(',as.Date(EstXdate[m,dim(EstXdate)[2]],origin="1970-01-01"),')`s', sep=""))  
+  if (x.lag == 2){
+    cat(paste(' X(',as.Date(est.xdate[m,1],origin="1970-01-01"),')`s X(',as.Date(est.xdate[m,dim(est.xdate)[2]],origin="1970-01-01"),')`s', sep=""))  
   }
-  if (xlag == 3) {
-    cat(paste(' X(',as.Date(EstXdate[m,1],origin="1970-01-01"),')`s X(',as.Date(EstXdate[m,2],origin="1970-01-01"),')`s X(',as.Date(EstXdate[m,dim(EstXdate)[2]],origin="1970-01-01"),')`s', sep=""))  
+  if (x.lag == 3) {
+    cat(paste(' X(',as.Date(est.xdate[m,1],origin="1970-01-01"),')`s X(',as.Date(est.xdate[m,2],origin="1970-01-01"),')`s X(',as.Date(est.xdate[m,dim(est.xdate)[2]],origin="1970-01-01"),')`s', sep=""))  
   }
-  if (xlag > 3){
-    cat(paste(' X(',as.Date(EstXdate[m,1],origin="1970-01-01"),')`s X(',as.Date(EstXdate[m,2],origin="1970-01-01"),')`s ... X(',as.Date(EstXdate[m,dim(EstXdate)[2]],origin="1970-01-01"),')`s', sep=""))  
+  if (x.lag > 3){
+    cat(paste(' X(',as.Date(est.xdate[m,1],origin="1970-01-01"),')`s X(',as.Date(est.xdate[m,2],origin="1970-01-01"),')`s ... X(',as.Date(est.xdate[m,dim(est.xdate)[2]],origin="1970-01-01"),')`s', sep=""))  
   }
   }
   }
-  Output = list(Est = EstY,EstYdate = EstYdate, EstX = EstX, EstXdate = EstXdate,
-                  EstLagY = EstLagY, EstLagYdate = EstLagYdate,
-                  OutY = OutY, OutYdate = OutYdate, OutX = OutX, OutXdate = OutXdate,
-                  OutLagY = OutLagY, OutLagYdate = OutLagYdate, Xlag = xlag, Ylag = ylag,
-                  MinDate = minDate, MaxDate = maxDate)
-  return(Output)
+  output = list(est.y = est.y,est.ydate = est.ydate, est.x = est.x, est.xdate = est.xdate,
+                  est.lag.y = est.lag.y, est.lag.ydate = est.lag.ydate,
+                  out.y = out.y, out.ydate = out.ydate, out.x = out.x, out.xdate = out.xdate,
+                  out.lag.y = out.lag.y, out.lag.ydate = out.lag.ydate, x.lag = x.lag, y.lag = y.lag,
+                  min.date = min.date, max.date = max.date)
+  return(output)
 }
 
-DateFreq <- function(DateVec) {
-  # DateFreq: Identify data frequency
+data.freq <- function(DateVec) {
+  # data.freq: Identify data frequency
   #
   # Input Arguments:
   #  %
@@ -364,7 +511,7 @@ dataMode  <- data[nobs]
 return(list(dataMode = dataMode, countMax = countMax))
 } # end of mode
 
-DatevecV <- function(s) {
+date.vec <- function(s) {
   mat <- matrix(0, nrow = length(s), ncol = 6 )
   a <- as.POSIXlt(as.Date(s, "1970-01-01"))
   mat[,1] <- a$year + 1900
@@ -377,12 +524,12 @@ DatevecV <- function(s) {
   list(mat)
 }
 
-lagNum <- function(xlag,period,unit){
+lag.num <- function(x.lag,period,unit){
 
-if(is.numeric(xlag)==T && is.atomic(xlag)==T && length(xlag) == 1L) {
-    return(xlag)
+if(is.numeric(x.lag)==T && is.atomic(x.lag)==T && length(x.lag) == 1L) {
+    return(x.lag)
 }
-  multiplier <- as.double(substr(xlag, start = 1, stop = nchar(xlag)-1))
+  multiplier <- as.double(substr(x.lag, start = 1, stop = nchar(x.lag)-1))
   if (is.na(multiplier)) {
     stop('The description of lags cannot be recognized. The format should be 3m, 1q, etc')
   }
@@ -391,49 +538,49 @@ if(is.numeric(xlag)==T && is.atomic(xlag)==T && length(xlag) == 1L) {
   ndaysPerQuarter <- 65
   ndaysPerMonth <- 22
   nhoursPerDay <- 8
-  if(substr(xlag, start = nchar(xlag), stop = nchar(xlag)) == 'y'){
+  if(substr(x.lag, start = nchar(x.lag), stop = nchar(x.lag)) == 'y'){
     multiplier <- multiplier * ndaysPerYear
   }
-  if(substr(xlag, start = nchar(xlag), stop = nchar(xlag)) == 'q'){
+  if(substr(x.lag, start = nchar(x.lag), stop = nchar(x.lag)) == 'q'){
     multiplier <- multiplier * ndaysPerQuarter
   }
-  if(substr(xlag, start = nchar(xlag), stop = nchar(xlag)) == 'q'){
+  if(substr(x.lag, start = nchar(x.lag), stop = nchar(x.lag)) == 'q'){
     multiplier <- multiplier * ndaysPerQuarter
   }
-  if(substr(xlag, start = nchar(xlag), stop = nchar(xlag)) == 'q'){
+  if(substr(x.lag, start = nchar(x.lag), stop = nchar(x.lag)) == 'q'){
     multiplier <- multiplier * ndaysPerQuarter
   }
-  if(substr(xlag, start = nchar(xlag), stop = nchar(xlag)) == 'm'){
+  if(substr(x.lag, start = nchar(x.lag), stop = nchar(x.lag)) == 'm'){
     multiplier <- multiplier * ndaysPerMonth
   }
-  if(substr(xlag, start = nchar(xlag), stop = nchar(xlag)) == 'd'){
+  if(substr(x.lag, start = nchar(x.lag), stop = nchar(x.lag)) == 'd'){
     multiplier <- multiplier * 1
   }
-  if(substr(xlag, start = nchar(xlag), stop = nchar(xlag)) == 'h'){
+  if(substr(x.lag, start = nchar(x.lag), stop = nchar(x.lag)) == 'h'){
     multiplier <- multiplier / nhoursPerDay
   }
-  if(substr(xlag, start = nchar(xlag), stop = nchar(xlag)) == 's'){
+  if(substr(x.lag, start = nchar(x.lag), stop = nchar(x.lag)) == 's'){
     multiplier <- multiplier /  (nhoursPerDay*60*60)
   }
   if(unit == 1) {
-    xlag <- round(multiplier / (ndaysPerYear * period))
+    x.lag <- round(multiplier / (ndaysPerYear * period))
   }
   if(unit == 2) {
-    xlag <- round(multiplier / (ndaysPerMonth * period))
+    x.lag <- round(multiplier / (ndaysPerMonth * period))
   }
   if(unit == 3) {
-    xlag <- round(multiplier / period)
+    x.lag <- round(multiplier / period)
   }
   if(unit == 4) {
-    xlag <- round(multiplier / (period / nhoursPerDay))
+    x.lag <- round(multiplier / (period / nhoursPerDay))
   }
   if(unit == 5) {
-    xlag <- round(multiplier / (period / nhoursPerDay / 60))
+    x.lag <- round(multiplier / (period / nhoursPerDay / 60))
   }
   if(unit == 6) {
-    xlag <- round(multiplier / (period / nhoursPerDay / 60 / 60))
+    x.lag <- round(multiplier / (period / nhoursPerDay / 60 / 60))
   }
-  return(xlag)
+  return(x.lag)
 }
 
 diff.time.mf <- function(time1, time2, origin, units = c("auto", "secs", "mins", "hours", "days", "weeks")) {
@@ -466,6 +613,7 @@ diff.time.mf <- function(time1, time2, origin, units = c("auto", "secs", "mins",
          days = .difftime(z/86400, units = "days"), 
          weeks = .difftime(z/(7 * 86400), units = "weeks"))
 }
+
 
 
 
