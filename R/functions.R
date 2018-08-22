@@ -1,5 +1,5 @@
 Rcpp::sourceCpp('R/routines.cpp')
-
+source('R/data_functions.R')
 fit.mv.dyn.quant <- function(theta,z,type=c("cav"),is.midas,opt.method=c("nelder-mead","cma-es"),opt.transform,mc=FALSE,quant.type=c("var","quant"),...) {
   call <- match.call()
   type <- match.arg(type)
@@ -28,7 +28,7 @@ fit.mv.dyn.quant <- function(theta,z,type=c("cav"),is.midas,opt.method=c("nelder
   p <- ncol(z$y)
   Y<-X<-a<-r<-c<-fit.u<-dat<-e.q<-kappa<-NULL
   for(i in 1:p){
-    dat$y <- z$y[,i]
+    dat$y <- z$y
     fit.u[[i]] <- fit.u.dyn.quant(theta[i],dat,type,is.midas[i],opt.method,opt.transform[i],mc,quant.type,dq.options)
     coeffs <- coef(fit.u[[i]])
     c[i] <- coeffs[1]

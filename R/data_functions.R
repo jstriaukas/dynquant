@@ -1,3 +1,35 @@
+mixed.freq.data.ref.lf <- function(req.lf,data.x,date,x.lag,horizon,est.start,est.end,disp.flag=TRUE){
+  first.date <- xdate[1]
+  end.date <- xdate[length(xdate)]
+  nh <- as.double(substr(req.lf, start = 1, stop = 1))
+  if(nh!=horizon){
+    warning('Variable req.lf should containt first element the same as horizon, it is set to horizon value: ' , paste(horizon))
+  }
+  if(substr(req.lf, start = nchar(req.lf), stop = nchar(req.lf)) == 'y'){
+    freq <- "years"
+    first.date <- end.period.date(first.date, 'y')
+  }
+  if(substr(req.lf, start = nchar(req.lf), stop = nchar(req.lf)) == 'q'){
+    freq <- "quarters"
+    first.date <- end.period.date(first.date, 'q')
+  }
+  if(substr(req.lf, start = nchar(req.lf), stop = nchar(req.lf)) == 'm'){
+    freq <- "months"
+    first.date <- end.period.date(first.date, 'm')
+  }
+  if(substr(req.lf, start = nchar(req.lf), stop = nchar(req.lf)) == 'd'){
+    freq <- "days"
+    first.date <- end.period.date(first.date, 'd')
+  }
+  date.end.period <- seq(as.Date(first.date),as.Date(end.date),by=freq)-1
+  output <- mixed.freq.data.single(date.end.period,data.x,date,x.lag,horizon,est.start,est.end,disp.flag)
+  return(output)
+}
+  
+  
+
+
+
 mixed.freq.data.single <- function(data.refdate,data.x,data.xdate,x.lag,horizon,est.start,est.end,disp.flag=TRUE) {
   # complete data
   mask.na <- !is.na(data.refdate)
@@ -165,7 +197,6 @@ mixed.freq.data.single <- function(data.refdate,data.x,data.xdate,x.lag,horizon,
                 x.lag = x.lag,min.date = min.date, max.date = max.date)
   return(output)
 }
-
 
 
 mixed.freq.data <- function(data.y,data.ydate,data.x,data.xdate,x.lag,y.lag,horizon,est.start,est.end,disp.flag=TRUE) {
@@ -539,12 +570,6 @@ if(is.numeric(x.lag)==T && is.atomic(x.lag)==T && length(x.lag) == 1L) {
   if(substr(x.lag, start = nchar(x.lag), stop = nchar(x.lag)) == 'q'){
     multiplier <- multiplier * ndaysPerQuarter
   }
-  if(substr(x.lag, start = nchar(x.lag), stop = nchar(x.lag)) == 'q'){
-    multiplier <- multiplier * ndaysPerQuarter
-  }
-  if(substr(x.lag, start = nchar(x.lag), stop = nchar(x.lag)) == 'q'){
-    multiplier <- multiplier * ndaysPerQuarter
-  }
   if(substr(x.lag, start = nchar(x.lag), stop = nchar(x.lag)) == 'm'){
     multiplier <- multiplier * ndaysPerMonth
   }
@@ -612,4 +637,31 @@ diff.time.mf <- function(time1, time2, origin, units = c("auto", "secs", "mins",
 
 
 
+end.period.date <- function(date, interval) {
+    date.lt <- as.POSIXlt(date) 
+    switch(interval, 
+           y = {
+             date.lt$mon = 11
+             date.lt$mday=31
+             date=as.Date(date.lt)
+           },
+           q = {
+             date.lt$mon = (date.lt$mon %/% 3 +1)*3 %% 12 
+             date.lt$mday = 1
+             date.lt$year = date.lt$year + as.integer(date.lt$mon==0)
+             date=as.Date(date.lt)-1
+           },
+           m = {
+             date.lt$mon = (date.lt$mon+1) %% 12
+             date.lt$mday = 1
+             date.lt$year = date.lt$year + as.integer(date.lt$mon==0)
+             date=as.Date(date.lt)-1
+           },
+           d = {
+             date = as.Date(date)
+           },
+           date = as.Date(date$lt)
+    )
+    return(date)
+  }
 

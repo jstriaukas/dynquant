@@ -7,7 +7,7 @@ require('optimx')
 require("cmaes")
 #require('ggplot2')
 source('R/functions.R')
-load("Data/dataCAViaR.RData")
+load("Data/MvMQCAViaRBanks.RData")
 type <- "cav"
 quant.type <- "quant"
 is.midas <- TRUE
