@@ -10,13 +10,8 @@ fit.mv.dyn.quant <- function(theta,z,type=c("cav"),is.midas,opt.method=c("nelder
     if(is.null(dq.options$ncores)) {ncores = detectCores()
     } else {ncores = dq.options$ncores}
   }
+  p <- ncol(z$y)
   if(is.null(dq.options$min.evals)){dq.options$min.evals = 1}
-  if (is.midas){
-    if (is.null(dq.options$y.lowfreq) || is.null(dq.options$x.highfreq)){
-      if (is.null(dq.options$period)){dq.options$period <- 22}
-      if (is.null(dq.options$nlag)){dq.options$nlag <- 22}
-    } 
-  }
   if(is.null(dq.options$num.test)){dq.options$num.test <- 1e3}
   if(length(theta)==1){theta=rep(theta,p)}
   if(length(theta)!=p){stop("number of quantile levels must equal to the number of covariates")}
@@ -25,10 +20,14 @@ fit.mv.dyn.quant <- function(theta,z,type=c("cav"),is.midas,opt.method=c("nelder
   if(length(opt.transform)<p){opt.transform=c(opt.transform,rep("lev",p-length(opt.transform)))}
   if(length(opt.transform)>p){stop("number of transformations exceed total number of covariates")}
   min.evals <- dq.options$min.evals
-  p <- ncol(z$y)
   Y<-X<-a<-r<-c<-fit.u<-dat<-e.q<-kappa<-NULL
   for(i in 1:p){
-    dat$y <- z$y
+    if (is.midas[i]==TRUE){
+      dat$y.lowfreq <- z$y[,i]
+      dat$x.highfreq <- z$x[[i]]
+    } else{
+      dat$y <- z$y
+    }
     fit.u[[i]] <- fit.u.dyn.quant(theta[i],dat,type,is.midas[i],opt.method,opt.transform[i],mc,quant.type,dq.options)
     coeffs <- coef(fit.u[[i]])
     c[i] <- coeffs[1]
@@ -82,10 +81,11 @@ compute.mv.quantile <- function(pars0,theta,z,is.midas,out.val=0,quant.type="var
   p <- ncol(Y)
   n <- nrow(Y)
   Xt <- array(0,c(n,p))
+  k2 <- NULL
   for(i in 1:p) { 
     if(is.midas[i]){
       k1 <- 1
-      k2 <- pars0[length(pars0)]
+      k2[i] <- pars0[length(pars0)]
       pars0 <- pars0[1:length(pars0)-1]
       nlag <- ncol(X[[i]])
       weights <- beta.poli.w(nlag, k1, k2)
@@ -114,6 +114,7 @@ compute.mv.quantile <- function(pars0,theta,z,is.midas,out.val=0,quant.type="var
     z$c <- C
     z$a <- A
     z$r <- R
+    z$k2 <- k2
     class(z) <- "dynquant"
   } else if(out.val == 0){
     z <- as.numeric(rq.stat)
@@ -144,14 +145,8 @@ fit.u.dyn.quant <- function(theta,z,type=c("cav","igarch","adapt","asymslope","r
     dq.options$empirical.quantile <- temp[100*theta]
   }
   empirical.quantile <- dq.options$empirical.quantile
-  if (is.midas){
-    if (is.null(dq.options$y.lowfreq) || is.null(dq.options$x.highfreq)){
-      if (is.null(dq.options$period)){dq.options$period <- 22}
-      if (is.null(dq.options$nlag)){dq.options$nlag <- 22}
-      z <- get.midas.structure(z$y,period=dq.options$period,nlag=dq.options$nlag)
-    } 
-  }
-  if(is.midas){ 
+
+  if(is.midas){  
     if(opt.transform=="lev"){z$X <- z$x.highfreq}
     if(opt.transform=="abs"){z$X <- abs(z$x.highfreq)}
     if(opt.transform=="sq"){z$X <- (z$x.highfreq)^2}
@@ -251,31 +246,6 @@ compute.u.quantile <- function(pars0,theta,z,type=c("symabs","igarch","cav","ada
   
 }
 
-get.midas.structure <- function(y,...){ 
-  Z         <- list(...)
-  nlag      <- Z$nlag
-  period    <- Z$period
-  if(is.null(period)){period <- 22}
-  if(is.null(nlag)){nlag <- 22}
-  tobs      <- length(y)
-  nobs.short <- tobs-nlag-period+1
-  data      <- get.midas.data(y,nobs.short,nlag=nlag,period=period)
-  z$y.lowfreq  <- data$y.lowfreq
-  z$x.highfreq <- data$x.highfreq
-  return(z)
-}
-
-get.midas.data <- function(y,nobs.short,nlag=22,period=22){
-  tobs <- length(y)
-  y.lowfreq <- array(0, c(nobs.short,1))
-  x.highfreq <- array(0, c(nobs.short,nlag))
-  regressor <- abs(y)
-  for (t in (nlag+1):(tobs-period+1)) {
-    y.lowfreq[t-nlag,1] <- sum(y[seq(t,t+period-1,by=1)])  
-    x.highfreq[t-nlag, ] <- t(regressor[seq(t-1,t-nlag,by=-1)])
-  }
-  return(list(y.lowfreq = y.lowfreq, x.highfreq = x.highfreq))
-}
 
 beta.poli.w <- function(nlag,coeff.1,coeff.2) {
   temp <- seq(0,1,length=nlag)
