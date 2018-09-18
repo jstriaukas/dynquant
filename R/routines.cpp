@@ -95,14 +95,15 @@ List MvMqCavLoop(NumericVector c,NumericMatrix a,NumericMatrix r,NumericMatrix y
     for (j = 0; j < p; ++j){
       /* summing rq statistic through cross section, allowing different theta value for predictors */
       temp += (y(i,j)-q(i,j))*(Theta(j)-(y(i,j)<q(i,j)));
+
     }
     /* summing rq through time */
     rq += temp;
     temp = 0;
   }
+  
   /* computing the average over time */
   rq = rq/n;
   return  List::create(Rcpp::Named("q") = q,Rcpp::Named("rq") = rq); /*,Rcpp::Named("s") = s,Rcpp::Named("sn") = sn*/
 }
-
 

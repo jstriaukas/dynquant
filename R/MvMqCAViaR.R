@@ -23,10 +23,8 @@ dat.x.2 <- mixed.freq.data.ref.lf(req.lf,r.2,y.date,22,1,y.date[44],y.date[lengt
 X.1 <- X.2 <- NULL
 X.1[[1]] <- X.2[[1]] <-  dat.r$est.x
 X.1[[2]] <- dat.x.1$est.x
-X.2[[2]] <- dat.x.2$est.x
 
 z.1 <- list(y = cbind(dat.r$est.y, dat.x.1$est.y), x = X.1)
-z.2 <- list(y = cbind(dat.r$est.y, dat.x.2$est.y), x = X.2)
 
 type <- "cav"
 quant.type <- "quant"
@@ -34,17 +32,9 @@ is.midas <- TRUE
 opt.method <- "cma-es"
 opt.transform <- c("abs","abs")
 mc <- TRUE
-theta <- c(0.05,0.05)
-dq.options <- NULL
+thetas <- c(0.01,0.05,0.25,0.50,0.75,0.95,0.99)
 min.evals <- 5
-fit.1 <- fit.mv.dyn.quant(theta,z.1,type,is.midas,opt.method,opt.transform,mc,quant.type,min.evals)
-fit.2 <- fit.mv.dyn.quant(theta,z.2,type,is.midas,opt.method,opt.transform,mc,quant.type,min.evals)
+fit.1 <- fit.mv.dyn.quants(thetas,type,is.midas,opt.method,opt.transform,mc,quant.type,min.evals = min.evals,isplot = TRUE,title = "SNP Quantiles")
 
-plot(fit.1$VaR[,1], type = 'l')
-plot(fit.1$VaR[,2], type = 'l')
-fit.1$k2
 
-plot(fit.2$VaR[,1], type = 'l')
-plot(fit.2$VaR[,2], type = 'l')
-fit.2$k2
 

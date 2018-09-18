@@ -1,5 +1,83 @@
 Rcpp::sourceCpp('R/routines.cpp')
 source('R/data_functions.R')
+source('R/plot_functions.R')
+
+get.mv.asymmetry <- function(thetas,z,type=c("cav"),is.midas,opt.method=c("nelder-mead","cma-es"),opt.transform,mc=FALSE,quant.type=c("var","quant"),...){
+  call <- match.call()
+  type <- match.arg(type)
+  opt.method <- match.arg(opt.method)
+  quant.type <- match.arg(quant.type)
+  dq.options <- list(...)
+  if(is.null(dq.options$isplot)){dq.options$isplot = TRUE}
+  fit <- NULL
+  p <- ncol(z$y)
+  for(i in 1:length(thetas)){
+    theta <- thetas[i]
+    cat("quantile = ", format(theta), "..")
+    fit.mv <- fit.mv.dyn.quant(theta,z,type,is.midas,opt.method,opt.transform,mc,quant.type,dq.options)
+    if (i==1){
+      fit$quant.mat <- array(0,c(dim(fit.mv$fitted.values)[1],dim(fit.mv$fitted.values)[2],length(thetas)))
+      fit$ceoff.mat <- array(0,c(length(coef(fit.mv)),dim(fit.mv$fitted.values)[2],length(thetas)))
+    }
+    fit$quant.mat[,,i] <- fit.mv$fitted.values
+    fit$all[[i]] <- fit.mv
+    cat("\n")
+  }
+  if(dq.options$isplot) {
+    for (i in 1:p){
+      plot.asymmetry(fit,z,
+                     title = dq.options$titles[i], 
+                     xlabelaxis = dq.options$xlabelaxis,
+                     ylabelaxis = dq.options$ylabelaxis,
+                     pdftitle = paste(dq.options$pdftitle,i,".pdf", sep="-"),
+                     wd = dq.options$wd)
+    }
+  }
+  return(fit)
+  
+}
+
+
+fit.mv.dyn.quants <- function(thetas,z,type=c("cav"),is.midas,opt.method=c("nelder-mead","cma-es"),opt.transform,mc=FALSE,quant.type=c("var","quant"),...){
+  call <- match.call()
+  type <- match.arg(type)
+  opt.method <- match.arg(opt.method)
+  quant.type <- match.arg(quant.type)
+  dq.options <- list(...)
+  if(is.null(dq.options$isplot)){dq.options$isplot = TRUE}
+  fit <- NULL
+  p <- ncol(z$y)
+  for(i in 1:length(thetas)){
+    theta <- thetas[i]
+    cat("quantile = ", format(theta), "..")
+    fit.mv <- fit.mv.dyn.quant(theta,z,type,is.midas,opt.method,opt.transform,mc,quant.type,dq.options)
+    if (i==1){
+      fit$quant.mat <- array(0,c(dim(fit.mv$fitted.values)[1],dim(fit.mv$fitted.values)[2],length(thetas)))
+    }
+    fit$quant.mat[,,i] <- fit.mv$fitted.values
+    fit$all[[i]] <- fit.mv
+    cat("\n")
+  }
+  if(dq.options$isplot) {
+    for (i in 1:p){
+    fit.single <- NULL 
+    fit.single$quant.mat <- fit$quant.mat[,i,]
+    z.single <- NULL
+    z.single$y <- z$y[,i]
+    z.single$date <- z$date
+    plot.quantiles(fit.single,z.single,
+                   title = dq.options$titles[i], 
+                   xlabelaxis = dq.options$xlabelaxis,
+                   ylabelaxis = dq.options$ylabelaxis,
+                   pdftitle = paste(dq.options$pdftitle,i,".pdf", sep="-"),
+                   wd = dq.options$wd)
+    }
+  }
+  return(fit)
+  
+}
+
+
 fit.mv.dyn.quant <- function(theta,z,type=c("cav"),is.midas,opt.method=c("nelder-mead","cma-es"),opt.transform,mc=FALSE,quant.type=c("var","quant"),...) {
   call <- match.call()
   type <- match.arg(type)
@@ -26,7 +104,7 @@ fit.mv.dyn.quant <- function(theta,z,type=c("cav"),is.midas,opt.method=c("nelder
       dat$y.lowfreq <- z$y[,i]
       dat$x.highfreq <- z$x[[i]]
     } else{
-      dat$y <- z$y
+      dat$y <- z$y[,i]
     }
     fit.u[[i]] <- fit.u.dyn.quant(theta[i],dat,type,is.midas[i],opt.method,opt.transform[i],mc,quant.type,dq.options)
     coeffs <- coef(fit.u[[i]])
@@ -123,7 +201,41 @@ compute.mv.quantile <- function(pars0,theta,z,is.midas,out.val=0,quant.type="var
   
 }
 
-fit.u.dyn.quant <- function(theta,z,type=c("cav","igarch","adapt","asymslope","rq"),is.midas,opt.method=c("nelder-mead","cma-es"),opt.transform=c("lev","abs","sq"),mc=FALSE,quant.type=c("var","quant"),...) {
+fit.u.dyn.quants <- function(thetas,z,type=c("cav","igarch","adapt","asymslope","rq"),is.midas,opt.method=c("nelder-mead","cma-es"),opt.transform=c("lev","abs","sq"),mc=FALSE,quant.type=c("var","quant"),...){
+call <- match.call()
+type <- match.arg(type)
+opt.method <- match.arg(opt.method)
+opt.transform <- match.arg(opt.transform)
+quant.type <- match.arg(quant.type)
+dq.options <- list(...)
+if(is.null(dq.options$isplot)){dq.options$isplot = TRUE}
+fit <- NULL
+for(i in 1:length(thetas)){
+  theta <- thetas[i]
+  cat("quantile = ", format(theta), "..")
+  fit.u <- fit.u.dyn.quant(theta,z,type,is.midas,opt.method,opt.transform,mc,quant.type,dq.options)
+  if (i==1){
+    fit$quant.mat <- array(0,c(length(fit.u$fitted.values),length(thetas)))
+  }
+  fit$quant.mat[,i] <- fit.u$fitted.values
+  fit$all[[i]] <- fit.u
+  cat("\n")
+}
+  if(dq.options$isplot) {
+    plot.quantiles(fit,z,
+                   title = dq.options$title, 
+                   xlabelaxis = dq.options$xlabelaxis,
+                   ylabelaxis = dq.options$ylabelaxis,
+                   pdftitle = dq.options$pdftitle,
+                   wd = dq.options$wd)
+  }
+  return(fit)
+
+}
+
+
+
+fit.u.dyn.quant <- function(theta,z,type=c("cav","igarch","adapt","asymslope","rq"),is.midas,opt.method=c("nelder-mead","cma-es"),opt.transform=c("lev","abs","sq"),mc=FALSE,quant.type=c("var","quant","es"),...) {
   call <- match.call()
   type <- match.arg(type)
   opt.method <- match.arg(opt.method)
@@ -138,10 +250,10 @@ fit.u.dyn.quant <- function(theta,z,type=c("cav","igarch","adapt","asymslope","r
       ncores = dq.options$ncores
     }
   }
-  if(is.null(dq.options$min.evals)){dq.options$min.evals = 1}
+  if(is.null(dq.options$min.evals)){dq.options$min.evals = 5}
   min.evals <- dq.options$min.evals
   if(is.null(dq.options$empirical.quantile)){
-    temp <- sort(z$y,decreasing=FALSE)
+      temp <- sort(z$y[1:100],decreasing=FALSE)
     dq.options$empirical.quantile <- temp[100*theta]
   }
   empirical.quantile <- dq.options$empirical.quantile
