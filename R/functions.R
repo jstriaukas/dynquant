@@ -34,7 +34,6 @@ get.mv.asymmetry <- function(thetas,z,type=c("cav"),is.midas,opt.method=c("nelde
     }
   }
   return(fit)
-  
 }
 
 
@@ -50,7 +49,7 @@ fit.mv.dyn.quants <- function(thetas,z,type=c("cav"),is.midas,opt.method=c("neld
   for(i in 1:length(thetas)){
     theta <- thetas[i]
     cat("quantile = ", format(theta), "..")
-    fit.mv <- fit.mv.dyn.quant(theta,z,type,is.midas,opt.method,opt.transform,mc,quant.type,dq.options)
+    fit.mv <- fit.mv.dyn.quant(theta,z,type,is.midas,opt.method,opt.transform,mc,quant.type,...)
     if (i==1){
       fit$quant.mat <- array(0,c(dim(fit.mv$fitted.values)[1],dim(fit.mv$fitted.values)[2],length(thetas)))
     }
@@ -94,7 +93,7 @@ fit.mv.dyn.quant <- function(theta,z,type=c("cav"),is.midas,opt.method=c("nelder
   if(length(theta)==1){theta=rep(theta,p)}
   if(length(theta)!=p){stop("number of quantile levels must equal to the number of covariates")}
   if(length(is.midas)==1){is.midas=rep(is.midas,p)}
-  if(length(is.midas)>p){stop("number of MIDAS weighted covariates must not exceed total number of covariates")}
+  if(length(is.midas)>p){stop("number of MIDAS weighted covariates must not exceed the total number of covariates")}
   if(length(opt.transform)<p){opt.transform=c(opt.transform,rep("lev",p-length(opt.transform)))}
   if(length(opt.transform)>p){stop("number of transformations exceed total number of covariates")}
   min.evals <- dq.options$min.evals
@@ -201,19 +200,19 @@ compute.mv.quantile <- function(pars0,theta,z,is.midas,out.val=0,quant.type="var
   
 }
 
-fit.u.dyn.quants <- function(thetas,z,type=c("cav","igarch","adapt","asymslope","rq"),is.midas,opt.method=c("nelder-mead","cma-es"),opt.transform=c("lev","abs","sq"),mc=FALSE,quant.type=c("var","quant"),...){
+fit.u.dyn.quants <- function(thetas,z,type=c("cav","igarch","adapt","asymslope","rq","ar.rq"),is.midas,opt.method=c("nelder-mead","cma-es"),opt.transform=c("lev","abs","sq"),mc=FALSE,quant.type=c("var","quant"),...){
 call <- match.call()
 type <- match.arg(type)
 opt.method <- match.arg(opt.method)
 opt.transform <- match.arg(opt.transform)
 quant.type <- match.arg(quant.type)
 dq.options <- list(...)
-if(is.null(dq.options$isplot)){dq.options$isplot = TRUE}
+if(is.null(dq.options$isplot)){dq.options$isplot = FALSE}
 fit <- NULL
 for(i in 1:length(thetas)){
   theta <- thetas[i]
   cat("quantile = ", format(theta), "..")
-  fit.u <- fit.u.dyn.quant(theta,z,type,is.midas,opt.method,opt.transform,mc,quant.type,dq.options)
+  fit.u <- fit.u.dyn.quant(theta,z,type,is.midas,opt.method,opt.transform,mc,quant.type,...)
   if (i==1){
     fit$quant.mat <- array(0,c(length(fit.u$fitted.values),length(thetas)))
   }
@@ -233,9 +232,7 @@ for(i in 1:length(thetas)){
 
 }
 
-
-
-fit.u.dyn.quant <- function(theta,z,type=c("cav","igarch","adapt","asymslope","rq"),is.midas,opt.method=c("nelder-mead","cma-es"),opt.transform=c("lev","abs","sq"),mc=FALSE,quant.type=c("var","quant","es"),...) {
+fit.u.dyn.quant <- function(theta,z,type=c("cav","igarch","adapt","asymslope","rq","ar.rq"),is.midas,opt.method=c("nelder-mead","cma-es"),opt.transform=c("lev","abs","sq"),mc=FALSE,quant.type=c("var","quant","es"),...) {
   call <- match.call()
   type <- match.arg(type)
   opt.method <- match.arg(opt.method)
@@ -250,6 +247,15 @@ fit.u.dyn.quant <- function(theta,z,type=c("cav","igarch","adapt","asymslope","r
       ncores = dq.options$ncores
     }
   }
+  if(type=="ar.rq"){
+    if(is.null(dq.options$y.lowfreqlag)) {
+      z$Y.lag <- NULL
+      type = 'rq'
+      warning("ARDL-MIDAS quantile model was selected, with no lagged values is dq.options. Type set to rq to proceed...")
+    } else {
+      z$Y.lag <- dq.options$y.lowfreqlag
+    }
+  } 
   if(is.null(dq.options$min.evals)){dq.options$min.evals = 5}
   min.evals <- dq.options$min.evals
   if(is.null(dq.options$empirical.quantile)){
@@ -257,12 +263,11 @@ fit.u.dyn.quant <- function(theta,z,type=c("cav","igarch","adapt","asymslope","r
     dq.options$empirical.quantile <- temp[100*theta]
   }
   empirical.quantile <- dq.options$empirical.quantile
-
   if(is.midas){  
     if(opt.transform=="lev"){z$X <- z$x.highfreq}
     if(opt.transform=="abs"){z$X <- abs(z$x.highfreq)}
     if(opt.transform=="sq"){z$X <- (z$x.highfreq)^2}
-    z$Y <- z$y.lowfreq
+    z$Y <- z$y
   } else {
     if(opt.transform=="lev"){z$X <- z$y}
     if(opt.transform=="abs"){z$X <- abs(z$y)}
@@ -303,7 +308,7 @@ fit.u.dyn.quant <- function(theta,z,type=c("cav","igarch","adapt","asymslope","r
   return(fit = fit)
 }
 
-compute.u.quantile <- function(pars0,theta,z,type=c("symabs","igarch","cav","adapt","asymslope","rq"),is.midas,out.val=0,quant.type="var",empirical.quantile) {
+compute.u.quantile <- function(pars0,theta,z,type=c("symabs","igarch","cav","adapt","asymslope","rq","ar.rq"),is.midas,out.val=0,quant.type="var",empirical.quantile) {
   if(is.midas){
     k1 <- 1
     k2 <- pars0[length(pars0)]
@@ -316,6 +321,10 @@ compute.u.quantile <- function(pars0,theta,z,type=c("symabs","igarch","cav","ada
   } else{
     X <- z$X
     Y <- z$Y
+    
+  }
+  if(type=="ar.rq"){
+    Y.lag = z$Y.lag
   }
   type <- match.arg(type)
   if(type=="cav"){
@@ -335,6 +344,11 @@ compute.u.quantile <- function(pars0,theta,z,type=c("symabs","igarch","cav","ada
     intercept <- pars0[1]
     slope <- pars0[2]
     q <- intercept+slope*X 
+  } else if(type=="ar.rq"){
+    intercept <- pars0[1]
+    slope <- pars0[2]
+    ar.coeff <- pars0[3]
+    q <- intercept+slope*X+ar.coeff*Y.lag
   } else {
     stop('Please choose a different type of CAViaR specification (see documentation for more details)')
   }
@@ -355,7 +369,6 @@ compute.u.quantile <- function(pars0,theta,z,type=c("symabs","igarch","cav","ada
     z <- as.numeric(rq.stat)
   }
   return(z)
-  
 }
 
 
@@ -642,7 +655,15 @@ get.u.constraints <- function(type,is.midas){
     const$LB[2] <- -100  
     const$UB[1] <-  100  
     const$UB[2] <-  100  
-  } else {
+  } else if(type=="ar.rq"){ 
+    const$LB[1] <- -100  
+    const$LB[2] <- -100 
+    const$LB[3] <- -1 
+    const$UB[1] <-  100  
+    const$UB[2] <-  100
+    const$UB[3] <-   1  
+  }
+    else {
     stop('CAViaR type either not implemented or does not exist')
   }
   if(is.midas) {
@@ -700,6 +721,11 @@ get.u.initial <- function(type,is.midas,num.test=1e3){
     starting.vals     <- array(NA, c(num.test,2))
     starting.vals[,1] <- runif(num.test, min =  0, 1) 
     starting.vals[,2] <- runif(num.test, min =  0, 1)
+  } else if(type=="ar.rq"){
+    starting.vals     <- array(NA, c(num.test,3))
+    starting.vals[,1] <- runif(num.test, min =  0, 1) 
+    starting.vals[,2] <- runif(num.test, min =  0, 1)
+    starting.vals[,3] <- runif(num.test, min =  -1, 1)
   }
   else {
     stop('CAViaR type either not implemented or does not exist')

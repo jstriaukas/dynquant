@@ -14,7 +14,7 @@ load("Data/dataQuantileMIDAS.RData")
 #load("C:/Users/Aq/Documents/R/win-library/3.5/bindrcpp/dataQuantileMIDAS.RData")
 type <- "cav"
 quant.type <- "quant"
-is.midas <- FALSE
+is.midas <- TRUE
 opt.method <- "cma-es"
 opt.transform <- "abs"
 mc <- FALSE
