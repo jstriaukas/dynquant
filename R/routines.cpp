@@ -51,6 +51,7 @@ NumericVector AdaptLoop(NumericVector Beta, NumericVector y, double THETA, doubl
   return(VaR);
 }
 
+
 // [[Rcpp::export]]
 NumericVector AsymSlopeLoop(NumericVector Beta, NumericVector y,  double EmpiricalQuantile)
 {
