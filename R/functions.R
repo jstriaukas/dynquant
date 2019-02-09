@@ -1,5 +1,82 @@
 Rcpp::sourceCpp('R/routines.cpp')
 source('R/data_functions.R')
+source('R/plot_functions.R')
+
+get.mv.asymmetry <- function(thetas,z,type=c("cav"),is.midas,opt.method=c("nelder-mead","cma-es"),opt.transform,mc=FALSE,quant.type=c("var","quant"),...){
+  call <- match.call()
+  type <- match.arg(type)
+  opt.method <- match.arg(opt.method)
+  quant.type <- match.arg(quant.type)
+  dq.options <- list(...)
+  if(is.null(dq.options$isplot)){dq.options$isplot = TRUE}
+  fit <- NULL
+  p <- ncol(z$y)
+  for(i in 1:length(thetas)){
+    theta <- thetas[i]
+    cat("quantile = ", format(theta), "..")
+    fit.mv <- fit.mv.dyn.quant(theta,z,type,is.midas,opt.method,opt.transform,mc,quant.type,dq.options)
+    if (i==1){
+      fit$quant.mat <- array(0,c(dim(fit.mv$fitted.values)[1],dim(fit.mv$fitted.values)[2],length(thetas)))
+      fit$ceoff.mat <- array(0,c(length(coef(fit.mv)),dim(fit.mv$fitted.values)[2],length(thetas)))
+    }
+    fit$quant.mat[,,i] <- fit.mv$fitted.values
+    fit$all[[i]] <- fit.mv
+    cat("\n")
+  }
+  if(dq.options$isplot) {
+    for (i in 1:p){
+      plot.asymmetry(fit,z,
+                     title = dq.options$titles[i], 
+                     xlabelaxis = dq.options$xlabelaxis,
+                     ylabelaxis = dq.options$ylabelaxis,
+                     pdftitle = paste(dq.options$pdftitle,i,".pdf", sep="-"),
+                     wd = dq.options$wd)
+    }
+  }
+  return(fit)
+}
+
+
+fit.mv.dyn.quants <- function(thetas,z,type=c("cav"),is.midas,opt.method=c("nelder-mead","cma-es"),opt.transform,mc=FALSE,quant.type=c("var","quant"),...){
+  call <- match.call()
+  type <- match.arg(type)
+  opt.method <- match.arg(opt.method)
+  quant.type <- match.arg(quant.type)
+  dq.options <- list(...)
+  if(is.null(dq.options$isplot)){dq.options$isplot = TRUE}
+  fit <- NULL
+  p <- ncol(z$y)
+  for(i in 1:length(thetas)){
+    theta <- thetas[i]
+    cat("quantile = ", format(theta), "..")
+    fit.mv <- fit.mv.dyn.quant(theta,z,type,is.midas,opt.method,opt.transform,mc,quant.type,...)
+    if (i==1){
+      fit$quant.mat <- array(0,c(dim(fit.mv$fitted.values)[1],dim(fit.mv$fitted.values)[2],length(thetas)))
+    }
+    fit$quant.mat[,,i] <- fit.mv$fitted.values
+    fit$all[[i]] <- fit.mv
+    cat("\n")
+  }
+  if(dq.options$isplot) {
+    for (i in 1:p){
+    fit.single <- NULL 
+    fit.single$quant.mat <- fit$quant.mat[,i,]
+    z.single <- NULL
+    z.single$y <- z$y[,i]
+    z.single$date <- z$date
+    plot.quantiles(fit.single,z.single,
+                   title = dq.options$titles[i], 
+                   xlabelaxis = dq.options$xlabelaxis,
+                   ylabelaxis = dq.options$ylabelaxis,
+                   pdftitle = paste(dq.options$pdftitle,i,".pdf", sep="-"),
+                   wd = dq.options$wd)
+    }
+  }
+  return(fit)
+  
+}
+
+
 fit.mv.dyn.quant <- function(theta,z,type=c("cav"),is.midas,opt.method=c("nelder-mead","cma-es"),opt.transform,mc=FALSE,quant.type=c("var","quant"),...) {
   call <- match.call()
   type <- match.arg(type)
@@ -10,25 +87,24 @@ fit.mv.dyn.quant <- function(theta,z,type=c("cav"),is.midas,opt.method=c("nelder
     if(is.null(dq.options$ncores)) {ncores = detectCores()
     } else {ncores = dq.options$ncores}
   }
+  p <- ncol(z$y)
   if(is.null(dq.options$min.evals)){dq.options$min.evals = 1}
-  if (is.midas){
-    if (is.null(dq.options$y.lowfreq) || is.null(dq.options$x.highfreq)){
-      if (is.null(dq.options$period)){dq.options$period <- 22}
-      if (is.null(dq.options$nlag)){dq.options$nlag <- 22}
-    } 
-  }
   if(is.null(dq.options$num.test)){dq.options$num.test <- 1e3}
   if(length(theta)==1){theta=rep(theta,p)}
   if(length(theta)!=p){stop("number of quantile levels must equal to the number of covariates")}
   if(length(is.midas)==1){is.midas=rep(is.midas,p)}
-  if(length(is.midas)>p){stop("number of MIDAS weighted covariates must not exceed total number of covariates")}
+  if(length(is.midas)>p){stop("number of MIDAS weighted covariates must not exceed the total number of covariates")}
   if(length(opt.transform)<p){opt.transform=c(opt.transform,rep("lev",p-length(opt.transform)))}
   if(length(opt.transform)>p){stop("number of transformations exceed total number of covariates")}
   min.evals <- dq.options$min.evals
-  p <- ncol(z$y)
   Y<-X<-a<-r<-c<-fit.u<-dat<-e.q<-kappa<-NULL
   for(i in 1:p){
-    dat$y <- z$y
+    if (is.midas[i]==TRUE){
+      dat$y.lowfreq <- z$y[,i]
+      dat$x.highfreq <- z$x[[i]]
+    } else{
+      dat$y <- z$y[,i]
+    }
     fit.u[[i]] <- fit.u.dyn.quant(theta[i],dat,type,is.midas[i],opt.method,opt.transform[i],mc,quant.type,dq.options)
     coeffs <- coef(fit.u[[i]])
     c[i] <- coeffs[1]
@@ -82,10 +158,11 @@ compute.mv.quantile <- function(pars0,theta,z,is.midas,out.val=0,quant.type="var
   p <- ncol(Y)
   n <- nrow(Y)
   Xt <- array(0,c(n,p))
+  k2 <- NULL
   for(i in 1:p) { 
     if(is.midas[i]){
       k1 <- 1
-      k2 <- pars0[length(pars0)]
+      k2[i] <- pars0[length(pars0)]
       pars0 <- pars0[1:length(pars0)-1]
       nlag <- ncol(X[[i]])
       weights <- beta.poli.w(nlag, k1, k2)
@@ -114,6 +191,7 @@ compute.mv.quantile <- function(pars0,theta,z,is.midas,out.val=0,quant.type="var
     z$c <- C
     z$a <- A
     z$r <- R
+    z$k2 <- k2
     class(z) <- "dynquant"
   } else if(out.val == 0){
     z <- as.numeric(rq.stat)
@@ -122,7 +200,39 @@ compute.mv.quantile <- function(pars0,theta,z,is.midas,out.val=0,quant.type="var
   
 }
 
-fit.u.dyn.quant <- function(theta,z,type=c("cav","igarch","adapt","asymslope","rq"),is.midas,opt.method=c("nelder-mead","cma-es"),opt.transform=c("lev","abs","sq"),mc=FALSE,quant.type=c("var","quant"),...) {
+fit.u.dyn.quants <- function(thetas,z,type=c("cav","igarch","adapt","asymslope","rq","ar.rq"),is.midas,opt.method=c("nelder-mead","cma-es"),opt.transform=c("lev","abs","sq"),mc=FALSE,quant.type=c("var","quant"),...){
+call <- match.call()
+type <- match.arg(type)
+opt.method <- match.arg(opt.method)
+opt.transform <- match.arg(opt.transform)
+quant.type <- match.arg(quant.type)
+dq.options <- list(...)
+if(is.null(dq.options$isplot)){dq.options$isplot = FALSE}
+fit <- NULL
+for(i in 1:length(thetas)){
+  theta <- thetas[i]
+  cat("quantile = ", format(theta), "..")
+  fit.u <- fit.u.dyn.quant(theta,z,type,is.midas,opt.method,opt.transform,mc,quant.type,...)
+  if (i==1){
+    fit$quant.mat <- array(0,c(length(fit.u$fitted.values),length(thetas)))
+  }
+  fit$quant.mat[,i] <- fit.u$fitted.values
+  fit$all[[i]] <- fit.u
+  cat("\n")
+}
+  if(dq.options$isplot) {
+    plot.quantiles(fit,z,
+                   title = dq.options$title, 
+                   xlabelaxis = dq.options$xlabelaxis,
+                   ylabelaxis = dq.options$ylabelaxis,
+                   pdftitle = dq.options$pdftitle,
+                   wd = dq.options$wd)
+  }
+  return(fit)
+
+}
+
+fit.u.dyn.quant <- function(theta,z,type=c("cav","igarch","adapt","asymslope","rq","ar.rq"),is.midas,opt.method=c("nelder-mead","cma-es"),opt.transform=c("lev","abs","sq"),mc=FALSE,quant.type=c("var","quant","es"),...) {
   call <- match.call()
   type <- match.arg(type)
   opt.method <- match.arg(opt.method)
@@ -137,25 +247,27 @@ fit.u.dyn.quant <- function(theta,z,type=c("cav","igarch","adapt","asymslope","r
       ncores = dq.options$ncores
     }
   }
-  if(is.null(dq.options$min.evals)){dq.options$min.evals = 1}
+  if(type=="ar.rq"){
+    if(is.null(dq.options$y.lowfreqlag)) {
+      z$Y.lag <- NULL
+      type = 'rq'
+      warning("ARDL-MIDAS quantile model was selected, with no lagged values is dq.options. Type set to rq to proceed...")
+    } else {
+      z$Y.lag <- dq.options$y.lowfreqlag
+    }
+  } 
+  if(is.null(dq.options$min.evals)){dq.options$min.evals = 5}
   min.evals <- dq.options$min.evals
   if(is.null(dq.options$empirical.quantile)){
-    temp <- sort(z$y,decreasing=FALSE)
+      temp <- sort(z$y[1:100],decreasing=FALSE)
     dq.options$empirical.quantile <- temp[100*theta]
   }
   empirical.quantile <- dq.options$empirical.quantile
-  if (is.midas){
-    if (is.null(dq.options$y.lowfreq) || is.null(dq.options$x.highfreq)){
-      if (is.null(dq.options$period)){dq.options$period <- 22}
-      if (is.null(dq.options$nlag)){dq.options$nlag <- 22}
-      z <- get.midas.structure(z$y,period=dq.options$period,nlag=dq.options$nlag)
-    } 
-  }
-  if(is.midas){ 
+  if(is.midas){  
     if(opt.transform=="lev"){z$X <- z$x.highfreq}
     if(opt.transform=="abs"){z$X <- abs(z$x.highfreq)}
     if(opt.transform=="sq"){z$X <- (z$x.highfreq)^2}
-    z$Y <- z$y.lowfreq
+    z$Y <- z$y
   } else {
     if(opt.transform=="lev"){z$X <- z$y}
     if(opt.transform=="abs"){z$X <- abs(z$y)}
@@ -196,7 +308,7 @@ fit.u.dyn.quant <- function(theta,z,type=c("cav","igarch","adapt","asymslope","r
   return(fit = fit)
 }
 
-compute.u.quantile <- function(pars0,theta,z,type=c("symabs","igarch","cav","adapt","asymslope","rq"),is.midas,out.val=0,quant.type="var",empirical.quantile) {
+compute.u.quantile <- function(pars0,theta,z,type=c("symabs","igarch","cav","adapt","asymslope","rq","ar.rq"),is.midas,out.val=0,quant.type="var",empirical.quantile) {
   if(is.midas){
     k1 <- 1
     k2 <- pars0[length(pars0)]
@@ -209,6 +321,10 @@ compute.u.quantile <- function(pars0,theta,z,type=c("symabs","igarch","cav","ada
   } else{
     X <- z$X
     Y <- z$Y
+    
+  }
+  if(type=="ar.rq"){
+    Y.lag = z$Y.lag
   }
   type <- match.arg(type)
   if(type=="cav"){
@@ -228,6 +344,11 @@ compute.u.quantile <- function(pars0,theta,z,type=c("symabs","igarch","cav","ada
     intercept <- pars0[1]
     slope <- pars0[2]
     q <- intercept+slope*X 
+  } else if(type=="ar.rq"){
+    intercept <- pars0[1]
+    slope <- pars0[2]
+    ar.coeff <- pars0[3]
+    q <- intercept+slope*X+ar.coeff*Y.lag
   } else {
     stop('Please choose a different type of CAViaR specification (see documentation for more details)')
   }
@@ -248,34 +369,8 @@ compute.u.quantile <- function(pars0,theta,z,type=c("symabs","igarch","cav","ada
     z <- as.numeric(rq.stat)
   }
   return(z)
-  
 }
 
-get.midas.structure <- function(y,...){ 
-  Z         <- list(...)
-  nlag      <- Z$nlag
-  period    <- Z$period
-  if(is.null(period)){period <- 22}
-  if(is.null(nlag)){nlag <- 22}
-  tobs      <- length(y)
-  nobs.short <- tobs-nlag-period+1
-  data      <- get.midas.data(y,nobs.short,nlag=nlag,period=period)
-  z$y.lowfreq  <- data$y.lowfreq
-  z$x.highfreq <- data$x.highfreq
-  return(z)
-}
-
-get.midas.data <- function(y,nobs.short,nlag=22,period=22){
-  tobs <- length(y)
-  y.lowfreq <- array(0, c(nobs.short,1))
-  x.highfreq <- array(0, c(nobs.short,nlag))
-  regressor <- abs(y)
-  for (t in (nlag+1):(tobs-period+1)) {
-    y.lowfreq[t-nlag,1] <- sum(y[seq(t,t+period-1,by=1)])  
-    x.highfreq[t-nlag, ] <- t(regressor[seq(t-1,t-nlag,by=-1)])
-  }
-  return(list(y.lowfreq = y.lowfreq, x.highfreq = x.highfreq))
-}
 
 beta.poli.w <- function(nlag,coeff.1,coeff.2) {
   temp <- seq(0,1,length=nlag)
@@ -560,7 +655,15 @@ get.u.constraints <- function(type,is.midas){
     const$LB[2] <- -100  
     const$UB[1] <-  100  
     const$UB[2] <-  100  
-  } else {
+  } else if(type=="ar.rq"){ 
+    const$LB[1] <- -100  
+    const$LB[2] <- -100 
+    const$LB[3] <- -1 
+    const$UB[1] <-  100  
+    const$UB[2] <-  100
+    const$UB[3] <-   1  
+  }
+    else {
     stop('CAViaR type either not implemented or does not exist')
   }
   if(is.midas) {
@@ -618,6 +721,11 @@ get.u.initial <- function(type,is.midas,num.test=1e3){
     starting.vals     <- array(NA, c(num.test,2))
     starting.vals[,1] <- runif(num.test, min =  0, 1) 
     starting.vals[,2] <- runif(num.test, min =  0, 1)
+  } else if(type=="ar.rq"){
+    starting.vals     <- array(NA, c(num.test,3))
+    starting.vals[,1] <- runif(num.test, min =  0, 1) 
+    starting.vals[,2] <- runif(num.test, min =  0, 1)
+    starting.vals[,3] <- runif(num.test, min =  -1, 1)
   }
   else {
     stop('CAViaR type either not implemented or does not exist')

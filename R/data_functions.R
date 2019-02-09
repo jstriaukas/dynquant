@@ -1,6 +1,8 @@
-mixed.freq.data.ref.lf <- function(req.lf,data.x,date,x.lag,horizon,est.start,est.end,disp.flag=TRUE){
-  first.date <- xdate[1]
-  end.date <- xdate[length(xdate)]
+require('chron')
+
+mixed.freq.data.ref.lf <- function(req.lf,data.x,date.x,x.lag,horizon,est.start,est.end,disp.flag=TRUE){
+  first.date <- date.x[1]
+  end.date <- date.x[length(date.x)]
   nh <- as.double(substr(req.lf, start = 1, stop = 1))
   if(nh!=horizon){
     warning('Variable req.lf should containt first element the same as horizon, it is set to horizon value: ' , paste(horizon))
@@ -21,8 +23,11 @@ mixed.freq.data.ref.lf <- function(req.lf,data.x,date,x.lag,horizon,est.start,es
     freq <- "days"
     first.date <- end.period.date(first.date, 'd')
   }
-  date.end.period <- seq(as.Date(first.date),as.Date(end.date),by=freq)-1
+  date.end.period <- seq(chron::chron(format(first.date, format = "%m/%d/%Y")),chron::chron(format(end.date, format = "%m/%d/%Y")),by=freq)-1 
+  date.end.period <- as.Date(date.end.period)
   output <- mixed.freq.data.single(date.end.period,data.x,date,x.lag,horizon,est.start,est.end,disp.flag)
+  output$est.ydate <- output$est.refdate
+  output$est.y <- rowSums(output$est.x)
   return(output)
 }
   
@@ -98,7 +103,7 @@ mixed.freq.data.single <- function(data.refdate,data.x,data.xdate,x.lag,horizon,
   }
   if (is.null(est.end)){
     est.end <- max.date
-  } else { if(est.end > max.date) {warning('Terminal date cannot be later than largest date account for lags. Reset to largest date possible: ', paste(max.date))
+  } else { if(est.end > max.date) {warning('Terminal date cannot be later than largest date accounting for lags. Reset to largest date possible: ', paste(max.date))
     est.end <- max.date}
   }
   # Construct reference date data
@@ -663,5 +668,7 @@ end.period.date <- function(date, interval) {
            date = as.Date(date$lt)
     )
     return(date)
-  }
+}
+
+
 
