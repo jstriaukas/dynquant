@@ -1,5 +1,5 @@
 # dynquant
-Dynamic quantile models for systemic risk modelling. Implementation contains the following models:
+Pacakge dynquant contains dynamic quantile models for systemic risk modelling (or in general dynamic quantile modeling). Implementation contains the following models:
 
 1. CAViaR (different specifications), see [1]. 
 2. MVMQCAViaR, see [3].
