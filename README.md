@@ -3,7 +3,7 @@ Dynamic quantile models for systemic risk modelling. Implementation contains the
 
 1. CAViaR (different specifications), see [1]. 
 2. MVMQCAViaR, see [3].
-2. QADL-MIDAS and QMIDAS, see [2] & [4].
+2. QARDL-MIDAS and QMIDAS, see [2] & [4].
 
 # References
 
