@@ -3,7 +3,7 @@ Pacakge dynquant contains dynamic quantile models for systemic risk modeling (or
 
 1. CAViaR (different specifications), see [1]. 
 2. MVMQCAViaR, see [3].
-2. QARDL-MIDAS and QMIDAS, see [2] & [4].
+2. QARDL-MIDAS and QMIDAS, see *midasml* package and [2] & [4].
 
 # References
 
