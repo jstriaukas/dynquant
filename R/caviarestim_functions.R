@@ -1,13 +1,5 @@
-if (.Platform$OS.type=="windows"){
-  foldername <- "C:/Users/Utilisateur/Documents/GitHub/inflation-risk-nowcasting/caviar"
-  foldername <- "C:/Users/User/Documents/GitHub/inflation-risk-nowcasting/caviar"
-} else {
-  foldername <- "~/Documents/GitHub/inflation-risk-nowcasting/caviar"
-}
-setwd(foldername)
-rm(foldername)
-Rcpp::sourceCpp("caviar_routines.cpp")
-setwd("../")
+# need to source cpp functions in src subfolder:
+# Rcpp::sourceCpp("caviar_routines.cpp")
 require("quantreg")
 require('foreach')
 require("optimx")
