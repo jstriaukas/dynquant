@@ -1,5 +1,5 @@
 # dynquant
-Pacakge dynquant implements dynamic quantile models allowing for covariates to be sampled at mixed frequency. Implementation contains the following models:
+Package dynquant implements dynamic quantile models allowing for covariates to be sampled at mixed frequency. Implementation contains the following models:
 
 1. CAViaR (different specifications, including MIDAS data), see [1]. 
 2. MVMQCAViaR (including MIDAS data), see [3].
